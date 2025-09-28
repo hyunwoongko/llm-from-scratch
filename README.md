@@ -1,5 +1,5 @@
 # rlhf-from-scratch
-This project aims to perform RLHF training from scratch, implementing almost all components manually except for PyTorch and Ray. Each module is a minimal, educational reimplementation of large-scale systems focusing on clarity and core concepts rather than production readiness.
+This project aims to perform RLHF training from scratch, implementing almost all components manually except for PyTorch and Ray. Each module is a minimal, educational reimplementation of large-scale systems focusing on clarity and core concepts rather than production readiness. It includes SFT (Supervised Fine Tuning), RLVR (Reinforcement Learning with Verifiable Reward), and an evaluation pipeline. We use a small version of Qwen3 model for training.
 
 ## Contents
 1. mini-datasets
