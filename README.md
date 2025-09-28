@@ -5,7 +5,7 @@ This project aims to perform RLHF training from scratch, implementing almost all
 
 | Category     | Description                                                | Reference                                                                        |
 |--------------|------------------------------------------------------------|----------------------------------------------------------------------------------|
-| datasets     | Minimal implementation of Hugging Face Datasets            | [datasets](https://github.com/huggingface/datasets)                              |
+| dataset      | Minimal implementation of Hugging Face Datasets            | [datasets](https://github.com/huggingface/datasets)                              |
 | rl           | Minimal implementation of PPO algorithm                    | [verl](https://github.com/volcengine/verl)                                       |
 | inference    | Minimal implementation of an inference engine like vLLM    | [nano-vllm](https://github.com/GeeeekExplorer/nano-vllm)                         |
 | parallelism  | Minimal implementation of model parallelism algorithms     | [oslo](https://github.com/EleutherAI/oslo)                                       |
