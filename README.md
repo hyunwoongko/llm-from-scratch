@@ -15,7 +15,7 @@ This project aims to perform RLHF training from scratch, implementing almost all
    - a minimal implementation of tensor/pipeline parallelism and fsdp
    - reference: https://github.com/EleutherAI/oslo
 5. custom triton kernels
-   - various kernel implementation using triton
+   - various kernel implementation including flash attention using triton
    - reference: https://github.com/kakaobrain/trident
 6. jupyter notebooks
    - educational materials of each component written in Korean  
