@@ -14,9 +14,9 @@ This project aims to perform RLHF training from scratch, implementing almost all
 4. mini-megatron
    - a minimal implementation of tensor/pipeline parallelism and fsdp
    - reference: https://github.com/EleutherAI/oslo
-4. custom triton kernels
+5. custom triton kernels
    - various kernel implementation using triton
    - reference: https://github.com/kakaobrain/trident
-5. jupyter notebooks
+6. jupyter notebooks
    - educational materials of each component written in Korean  
    - reference: https://github.com/tunib-ai/large-scale-lm-tutorials
