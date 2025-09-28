@@ -1,4 +1,4 @@
-# RLHF from scratch
+# Nano RLHF
 This project aims to perform RLHF training from scratch, implementing almost all components manually except for PyTorch and Ray. Each module is a minimal, educational reimplementation of large-scale systems focusing on clarity and core concepts rather than production readiness. This includes SFT and RL training pipeline with evaluation, for training a small Qwen3 model on an open-source math dataset.
 
 ## Contents
