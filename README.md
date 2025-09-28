@@ -1,5 +1,5 @@
 # RLHF from scratch
-This project aims to perform RLHF training from scratch, implementing almost all components manually except for PyTorch and Ray. Each module is a minimal, educational reimplementation of large-scale systems focusing on clarity and core concepts rather than production readiness. This includes SFT and RL training and an evaluation pipeline that uses a small Qwen3 model and an open-source math dataset for training.
+This project aims to perform RLHF training from scratch, implementing almost all components manually except for PyTorch and Ray. Each module is a minimal, educational reimplementation of large-scale systems focusing on clarity and core concepts rather than production readiness. This includes SFT and RL training, along with an evaluation pipeline for training a small Qwen3 model on an open-source math dataset.
 
 ## Contents
 
