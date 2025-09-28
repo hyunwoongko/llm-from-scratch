@@ -18,5 +18,5 @@ This project aims to perform RLHF training from scratch, implementing almost all
    - various kernel implementation using triton
    - reference: https://github.com/kakaobrain/trident
 5. jupyter notebooks
-   - lecture materials written in Korean  
+   - educational materials of each component written in Korean  
    - reference: https://github.com/tunib-ai/large-scale-lm-tutorials
