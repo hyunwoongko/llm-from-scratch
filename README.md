@@ -5,7 +5,7 @@ This project aims to perform RLHF training from scratch, implementing almost all
 
 | Category     | Description                                                | Reference                                                                        |
 |--------------|------------------------------------------------------------|----------------------------------------------------------------------------------|
-| rl           | Implementation of PPO algorithm                            | [verl](https://github.com/volcengine/verl)                                       |
+| training     | Implementation of SFT and PPO trainers                     | [verl](https://github.com/volcengine/verl)                                       |
 | parallelism  | Implementation of various parallelism algorithms           | [oslo](https://github.com/EleutherAI/oslo)                                       |
 | datasets     | Simplified implementation of Hugging Face Datasets         | [datasets](https://github.com/huggingface/datasets)                              |
 | inference    | Simplified implementation of vLLM                          | [nano-vllm](https://github.com/GeeeekExplorer/nano-vllm)                         |
