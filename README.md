@@ -1,5 +1,5 @@
 # llm-from-scratch
-This project aims to perform RL training by implementing most of the code from scratch, except for PyTorch and Ray. Many components are implemented as minimal versions that omit details and include only the core logic, and they are intended for educational purposes rather than use in real large-scale RL training.
+This project aims to perform RLHF training from scratch, implementing almost all components manually except for PyTorch and Ray. Each module is a minimal, educational reimplementation of large-scale systems focusing on clarity and core concepts rather than production readiness.
 
 ## Contents
 1. mini-datasets
@@ -11,7 +11,7 @@ This project aims to perform RL training by implementing most of the code from s
 3. mini-vllm
    - simple implementation of vllm
    - reference: https://github.com/GeeeekExplorer/nano-vllm
-4. simple-megatron
+4. mini-megatron
    - simple implementation of tensor/pipeline parallelism and fsdp
    - reference: https://github.com/EleutherAI/oslo
 4. custom triton kernels
