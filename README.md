@@ -3,16 +3,16 @@ This project aims to perform RLHF training from scratch, implementing almost all
 
 ## Contents
 1. mini-datasets
-   - simple implementation of huggingface datasets
+   - a minimal implementation of huggingface datasets
    - reference: https://github.com/huggingface/datasets
 2. mini-verl
-   - simple implementation of verl
+   - a minimal implementation of verl
    - reference: https://github.com/volcengine/verl
 3. mini-vllm
-   - simple implementation of vllm
+   - a minimal implementation of vllm
    - reference: https://github.com/GeeeekExplorer/nano-vllm
 4. mini-megatron
-   - simple implementation of tensor/pipeline parallelism and fsdp
+   - a minimal implementation of tensor/pipeline parallelism and fsdp
    - reference: https://github.com/EleutherAI/oslo
 4. custom triton kernels
    - various kernel implementation using triton
