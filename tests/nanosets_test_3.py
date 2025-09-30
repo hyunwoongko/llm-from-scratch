@@ -1,6 +1,3 @@
-# bench_io_read_partial.py
-# Benchmark: JSON/JSONL vs NANO-IPC for initial read + partial column access
-# Pretty output using "tabulate" only.
 import argparse
 import json
 import os
@@ -13,7 +10,6 @@ from typing import Dict
 from tabulate import tabulate
 
 from nanorlhf.nanosets.data_type.list_array import ListArray
-# Array classes for physical-size accounting
 from nanorlhf.nanosets.data_type.primitive_array import PrimitiveArray
 from nanorlhf.nanosets.data_type.string_array import StringArray
 from nanorlhf.nanosets.data_type.struct_array import StructArray
@@ -22,9 +18,6 @@ from nanorlhf.nanosets.table.record_batch import RecordBatch
 from nanorlhf.nanosets.table.table import Table
 
 
-# -----------------------
-# Data generation
-# -----------------------
 def gen_rows(n: int = 1000, seed: int = 42):
     """Generate synthetic nested rows for benchmarking."""
     random.seed(seed)
@@ -41,9 +34,6 @@ def gen_rows(n: int = 1000, seed: int = 42):
     return rows
 
 
-# -----------------------
-# Timing helpers
-# -----------------------
 @contextmanager
 def timer():
     """Context manager returning a lambda for elapsed seconds."""
@@ -69,9 +59,6 @@ def size_of(path: str) -> str:
     return human_bytes(os.path.getsize(path)) if os.path.exists(path) else "0 B"
 
 
-# -----------------------
-# Shallow+recursive in-memory size (approx)
-# -----------------------
 def deep_size(obj, seen=None) -> int:
     """Rough recursive size of Python objects to compare materialized lists."""
     if seen is None:
@@ -92,9 +79,6 @@ def deep_size(obj, seen=None) -> int:
     return size
 
 
-# -----------------------
-# JSON / JSONL helpers
-# -----------------------
 def ensure_json(path_json: str, rows):
     """Write JSON once if file does not exist."""
     if not os.path.exists(path_json):
@@ -145,9 +129,6 @@ def partial_from_jsonl_stream(path: str, field: str):
     return out
 
 
-# -----------------------
-# NANO IPC helpers
-# -----------------------
 def ensure_nano(path_nano: str, rows):
     """Write NANO-IPC file once if file does not exist."""
     if not os.path.exists(path_nano):
@@ -200,9 +181,6 @@ def nano_column_physical_bytes(table: Table, column_name: str) -> int:
     return total
 
 
-# -----------------------
-# Tabulate output
-# -----------------------
 def print_benchmark_tables(
     out_dir: str,
     field: str,
@@ -281,9 +259,6 @@ Why do we see fast initial reads with NANO-IPC but different partial-access beha
     print(rationale)
 
 
-# -----------------------
-# Main
-# -----------------------
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rows", type=int, default=100_000, help="rows to generate if files are absent")
@@ -303,7 +278,7 @@ def main():
     ensure_jsonl(p_jsonl, rows)
     ensure_nano(p_nano, rows)
 
-    # --- JSON: full read, then partial extraction ---
+    # JSON: full read, then partial extraction
     with timer() as t:
         rows_json = read_json(p_json)
     t_read_json = t()
@@ -312,7 +287,7 @@ def main():
     t_partial_json = t()
     size_part_json = deep_size(part_json)
 
-    # --- JSONL: full read, then partial extraction (and streaming variant) ---
+    # JSONL: full read, then partial extraction (and streaming variant)
     with timer() as t:
         rows_jsonl = read_jsonl(p_jsonl)
     t_read_jsonl = t()
@@ -326,7 +301,7 @@ def main():
     t_partial_jsonl_stream = t()
     size_part_jsonl_stream = deep_size(part_jsonl_stream)
 
-    # --- NANO-IPC: table read (zero-copy), then single-column materialization ---
+    # NANO-IPC: table read (zero-copy), then single-column materialization
     with timer() as t:
         table_nano = read_nano_table(p_nano)
     t_read_nano = t()
