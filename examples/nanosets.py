@@ -92,10 +92,10 @@ def main():
     )
     show("Chained ops (shuffle→select→select_columns→map)", out, n=3)
 
-    # 11) Save JSON (lines=True → JSONL)
+    # 11) Save JSONL (lines=True)
     ds_len.to_json("data/gsm8k_len.jsonl", lines=True)
 
-    # 11) Save JSON (lines=False → JSON)
+    # 11) Save JSON (lines=False)
     ds_len.to_json("data/gsm8k_len.json", lines=False)
 
     # 12) Load/concatenate multiple files (example)
