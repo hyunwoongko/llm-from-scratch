@@ -1,6 +1,6 @@
 """
 Notes:
-    IPC Stands for 'Inter-Process Communication'.
+    IPC stands for 'Inter-Process Communication'.
 """
 
 import json
