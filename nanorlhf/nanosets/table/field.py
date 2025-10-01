@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from nanorlhf.nanosets.data_type.data_type import DataType
+from nanorlhf.nanosets.dtype.dtype import DataType
 
 
 @dataclass(frozen=True)
@@ -15,7 +15,7 @@ class Field:
         nullable (bool): whether the column can contain null values
 
     Examples:
-        >>> from nanorlhf.nanosets.data_type.data_type import INT32
+        >>> from nanorlhf.nanosets.dtype.dtype import INT32
         >>> Field("age", INT32, False)
         Field(name='age', dtype=DataType(name='int32'), nullable=False)
 

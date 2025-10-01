@@ -9,10 +9,10 @@ from typing import Dict
 
 from tabulate import tabulate
 
-from nanorlhf.nanosets.data_type.list_array import ListArray
-from nanorlhf.nanosets.data_type.primitive_array import PrimitiveArray
-from nanorlhf.nanosets.data_type.string_array import StringArray
-from nanorlhf.nanosets.data_type.struct_array import StructArray
+from nanorlhf.nanosets.dtype.list_array import ListArray
+from nanorlhf.nanosets.dtype.primitive_array import PrimitiveArray
+from nanorlhf.nanosets.dtype.string_array import StringArray
+from nanorlhf.nanosets.dtype.struct_array import StructArray
 from nanorlhf.nanosets.io.ipc import write_table, read_table
 from nanorlhf.nanosets.table.record_batch import RecordBatch
 from nanorlhf.nanosets.table.table import Table

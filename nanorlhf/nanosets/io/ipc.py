@@ -10,11 +10,11 @@ from typing import List
 
 from nanorlhf.nanosets.base.bitmap import Bitmap
 from nanorlhf.nanosets.base.buffer import Buffer
-from nanorlhf.nanosets.data_type.data_type import DataType
-from nanorlhf.nanosets.data_type.primitive_array import PrimitiveArray
-from nanorlhf.nanosets.data_type.string_array import StringArray
-from nanorlhf.nanosets.data_type.list_array import ListArray
-from nanorlhf.nanosets.data_type.struct_array import StructArray
+from nanorlhf.nanosets.dtype.dtype import DataType
+from nanorlhf.nanosets.dtype.primitive_array import PrimitiveArray
+from nanorlhf.nanosets.dtype.string_array import StringArray
+from nanorlhf.nanosets.dtype.list_array import ListArray
+from nanorlhf.nanosets.dtype.struct_array import StructArray
 from nanorlhf.nanosets.table.field import Field
 from nanorlhf.nanosets.table.record_batch import RecordBatch
 from nanorlhf.nanosets.table.schema import Schema

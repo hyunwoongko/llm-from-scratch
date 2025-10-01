@@ -1,12 +1,12 @@
 import json
 from typing import Any, Dict, List, Optional, TextIO, Union
 
-from nanorlhf.nanosets.data_type.array import Array
-from nanorlhf.nanosets.data_type.data_type import DataType, FMT, STRING, LIST, STRUCT
-from nanorlhf.nanosets.data_type.list_array import ListArray
-from nanorlhf.nanosets.data_type.primitive_array import PrimitiveArray
-from nanorlhf.nanosets.data_type.string_array import StringArray
-from nanorlhf.nanosets.data_type.struct_array import StructArray
+from nanorlhf.nanosets.dtype.array import Array
+from nanorlhf.nanosets.dtype.dtype import DataType, FMT, STRING, LIST, STRUCT
+from nanorlhf.nanosets.dtype.list_array import ListArray
+from nanorlhf.nanosets.dtype.primitive_array import PrimitiveArray
+from nanorlhf.nanosets.dtype.string_array import StringArray
+from nanorlhf.nanosets.dtype.struct_array import StructArray
 from nanorlhf.nanosets.table.field import Field
 from nanorlhf.nanosets.table.record_batch import RecordBatch
 from nanorlhf.nanosets.table.schema import Schema

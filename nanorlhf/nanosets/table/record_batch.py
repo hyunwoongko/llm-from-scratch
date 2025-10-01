@@ -1,7 +1,7 @@
 from typing import List, Union, Optional, Dict, Any
 
-from nanorlhf.nanosets.data_type.array import Array
-from nanorlhf.nanosets.data_type.struct_array import StructArray
+from nanorlhf.nanosets.dtype.array import Array
+from nanorlhf.nanosets.dtype.struct_array import StructArray
 from nanorlhf.nanosets.table.field import Field
 from nanorlhf.nanosets.table.schema import Schema
 
@@ -17,9 +17,9 @@ class RecordBatch:
     Examples:
         >>> from nanorlhf.nanosets.table.schema import Schema
         >>> from nanorlhf.nanosets.table.field import Field
-        >>> from nanorlhf.nanosets.data_type.data_type import INT32, FLOAT32, STRING
-        >>> from nanorlhf.nanosets.data_type.primitive_array import PrimitiveArray
-        >>> from nanorlhf.nanosets.data_type.string_array import StringArray
+        >>> from nanorlhf.nanosets.dtype.dtype import INT32, FLOAT32, STRING
+        >>> from nanorlhf.nanosets.dtype.primitive_array import PrimitiveArray
+        >>> from nanorlhf.nanosets.dtype.string_array import StringArray
         >>> schema = Schema(
         >>>     (
         ...              Field("x", INT32),

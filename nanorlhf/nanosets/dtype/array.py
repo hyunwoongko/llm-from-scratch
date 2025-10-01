@@ -3,7 +3,7 @@ from typing import Optional
 from typing import TypeVar, Generic
 
 from nanorlhf.nanosets.base.bitmap import Bitmap
-from nanorlhf.nanosets.data_type.data_type import DataType
+from nanorlhf.nanosets.dtype.dtype import DataType
 
 
 class Array(ABC):

@@ -3,8 +3,8 @@ from typing import List, Optional
 
 from nanorlhf.nanosets.base.bitmap import Bitmap
 from nanorlhf.nanosets.base.buffer import Buffer
-from nanorlhf.nanosets.data_type.array import Array, ArrayBuilder
-from nanorlhf.nanosets.data_type.data_type import (
+from nanorlhf.nanosets.dtype.array import Array, ArrayBuilder
+from nanorlhf.nanosets.dtype.dtype import (
     DataType,
     PrimitiveType,
     FMT,

@@ -3,8 +3,8 @@ from typing import Optional, List
 
 from nanorlhf.nanosets.base.bitmap import Bitmap
 from nanorlhf.nanosets.base.buffer import Buffer
-from nanorlhf.nanosets.data_type.array import Array, ArrayBuilder
-from nanorlhf.nanosets.data_type.data_type import STRING
+from nanorlhf.nanosets.dtype.array import Array, ArrayBuilder
+from nanorlhf.nanosets.dtype.dtype import STRING
 
 
 class StringArray(Array):

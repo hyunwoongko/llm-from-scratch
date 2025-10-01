@@ -14,7 +14,7 @@ class Schema:
         fields (tuple[Field, ...]): A tuple of Field objects describing each column.
 
     Example:
-        >>> from nanorlhf.nanosets.data_type.data_type import INT32, DataType
+        >>> from nanorlhf.nanosets.dtype.dtype import INT32, DataType
         >>> schema = Schema((
         ...     Field("id", INT32, nullable=False),
         ...     Field("name", DataType("string")),

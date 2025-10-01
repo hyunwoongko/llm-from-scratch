@@ -1,11 +1,11 @@
 from typing import Optional, Dict, Any, List
 
 from nanorlhf.nanosets.base.bitmap import Bitmap
-from nanorlhf.nanosets.data_type.array import Array, ArrayBuilder
-from nanorlhf.nanosets.data_type.data_type import STRUCT
-from nanorlhf.nanosets.data_type.list_array import ListArrayBuilder, infer_child_builder
-from nanorlhf.nanosets.data_type.primitive_array import infer_primitive_dtype, PrimitiveArrayBuilder
-from nanorlhf.nanosets.data_type.string_array import StringArrayBuilder
+from nanorlhf.nanosets.dtype.array import Array, ArrayBuilder
+from nanorlhf.nanosets.dtype.dtype import STRUCT
+from nanorlhf.nanosets.dtype.list_array import ListArrayBuilder, infer_child_builder
+from nanorlhf.nanosets.dtype.primitive_array import infer_primitive_dtype, PrimitiveArrayBuilder
+from nanorlhf.nanosets.dtype.string_array import StringArrayBuilder
 
 
 def get_struct_array_builder_from_rows(rows: List[Optional[Dict[str, Any]]]) -> "StructArrayBuilder":
@@ -300,9 +300,9 @@ class StructArrayBuilder(ArrayBuilder[Optional[Dict[str, Any]], StructArray]):
         strict_keys: If True, raising on unexpected keys in input rows. If False, ignore them.
 
     Example:
-        >>> from nanorlhf.nanosets.data_type.primitive_array import PrimitiveArrayBuilder, INT64
-        >>> from nanorlhf.nanosets.data_type.string_array import StringArrayBuilder
-        >>> from nanorlhf.nanosets.data_type.list_array import ListArrayBuilder
+        >>> from nanorlhf.nanosets.dtype.primitive_array import PrimitiveArrayBuilder, INT64
+        >>> from nanorlhf.nanosets.dtype.string_array import StringArrayBuilder
+        >>> from nanorlhf.nanosets.dtype.list_array import ListArrayBuilder
         >>> names = ["id", "name", "tags"]
 
         >>> sb = StructArrayBuilder(
@@ -357,7 +357,7 @@ class StructArrayBuilder(ArrayBuilder[Optional[Dict[str, Any]], StructArray]):
             keys = set(row.keys())
             names_set = set(self.names)
             extras = sorted(keys - names_set)
-            missing = [name for name in self.names if name not in keys]  # 순서 보존
+            missing = [name for name in self.names if name not in keys]
             if extras or missing:
                 raise KeyError(
                     f"Struct row keys mismatch. extras={extras}, missing={missing}"
@@ -365,7 +365,7 @@ class StructArrayBuilder(ArrayBuilder[Optional[Dict[str, Any]], StructArray]):
 
         self.validity.append(1)
         for name, child in zip(self.names, self.child_builders):
-            value = row.get(name, None)  # 키가 없으면 None
+            value = row.get(name, None)
             child.append(value)
         return self
 

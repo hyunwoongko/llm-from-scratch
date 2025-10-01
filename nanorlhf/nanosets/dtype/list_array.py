@@ -4,10 +4,10 @@ from typing import List
 
 from nanorlhf.nanosets.base.bitmap import Bitmap
 from nanorlhf.nanosets.base.buffer import Buffer
-from nanorlhf.nanosets.data_type.array import Array, ArrayBuilder
-from nanorlhf.nanosets.data_type.data_type import LIST, PrimitiveType
-from nanorlhf.nanosets.data_type.primitive_array import infer_primitive_dtype, PrimitiveArrayBuilder
-from nanorlhf.nanosets.data_type.string_array import StringArrayBuilder
+from nanorlhf.nanosets.dtype.array import Array, ArrayBuilder
+from nanorlhf.nanosets.dtype.dtype import LIST, PrimitiveType
+from nanorlhf.nanosets.dtype.primitive_array import infer_primitive_dtype, PrimitiveArrayBuilder
+from nanorlhf.nanosets.dtype.string_array import StringArrayBuilder
 
 ChildE = TypeVar("ChildE")
 
@@ -78,7 +78,7 @@ def infer_child_builder(rows: List[Optional[Iterable[Any]]]) -> ArrayBuilder:
                     dict_elems.append(elem)
                 else:
                     raise TypeError(f"Mixed element types: expected dict, got {type(elem).__name__}")
-        from nanorlhf.nanosets.data_type.struct_array import get_struct_array_builder_from_rows
+        from nanorlhf.nanosets.dtype.struct_array import get_struct_array_builder_from_rows
         return get_struct_array_builder_from_rows(dict_elems)
 
     # 2.3. Strings
