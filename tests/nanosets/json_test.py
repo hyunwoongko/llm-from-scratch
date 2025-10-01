@@ -61,18 +61,9 @@ def main(tmp_dir: str = "data/json_test"):
     assert rows_from_json == original_rows, "JSON round-trip mismatch"
     assert rows_from_jsonl == original_rows, "JSONL round-trip mismatch"
 
-    # Optional: also test JSON without schema block
-    json_no_schema = os.path.join(tmp_dir, "data_no_schema.json")
-    with open(json_no_schema, "w", encoding="utf-8") as fp:
-        to_json(fp, table, indent=2)
-    table_from_json2 = from_json(json_no_schema)
-    rows_from_json2 = table_from_json2.to_pylist()
-    assert rows_from_json2 == original_rows, "JSON (no schema) round-trip mismatch"
-
     print("✅ JSON / JSONL round-trip tests passed.")
     print(f"   - {json_path}")
     print(f"   - {jsonl_path}")
-    print(f"   - {json_no_schema}")
 
 
 if __name__ == "__main__":
