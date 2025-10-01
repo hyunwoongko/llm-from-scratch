@@ -104,28 +104,47 @@ def _build_array_from_values(dtype: DataType, values: List[Any]) -> Array:
     raise TypeError(f"Unsupported dtype in JSON schema: {dtype!r}")
 
 
-def to_json(fp: TextIO, obj: Union[Table, RecordBatch], *, include_schema: bool = True,
-            indent: Optional[int] = 2) -> None:
+def to_json(
+    fp: TextIO,
+    obj: Union[Table, RecordBatch],
+    *,
+    include_schema: bool = True,
+    indent: Optional[int] = 2,
+    rows_only: bool = False,
+) -> None:
     """
-    Write a Table or RecordBatch to a JSON file (optionally including schema).
+    Write a Table or RecordBatch to a JSON file.
 
-    This serializes data as a JSON object:
-        {
-          "schema": { ... },   # optional, if include_schema=True
-          "rows": [ { ... }, { ... }, ... ]
-        }
+    Formats:
+      - rows_only=False (default):
+          {
+            "schema": { ... },   # omitted if include_schema=False
+            "rows": [ { ... }, { ... }, ... ]
+          }
+      - rows_only=True:
+          [ { ... }, { ... }, ... ]
 
     Args:
         fp: Writable *text* file-like object (opened with mode 'w' and proper encoding).
         obj: Table or RecordBatch.
-        include_schema: If True, include a 'schema' object with field names, dtypes, and nullability.
+        include_schema: Include a 'schema' object when rows_only is False.
         indent: Indentation level for pretty-printing (None for compact).
+        rows_only: If True, write only the rows list at the root (no wrapper object).
 
     Notes:
+        - When `rows_only=True`, schema cannot be written. If `include_schema=True` is also set,
+          this function raises a ValueError.
         - Rows are produced by `to_pylist()`, so nested Lists/Structs appear as Python lists/dicts.
         - This is a whole-file write (not streaming). For streaming, prefer `to_jsonl()`.
     """
     rows, schema = _rows_and_schema_from_obj(obj)
+
+    if rows_only:
+        if include_schema:
+            raise ValueError("Cannot write schema when rows_only=True.")
+        json.dump(rows, fp, ensure_ascii=False, indent=indent)
+        return
+
     payload: Dict[str, Any] = {"rows": rows}
     if include_schema:
         payload["schema"] = _schema_to_json(schema)
