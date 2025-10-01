@@ -182,8 +182,6 @@ def nano_column_physical_bytes(table: Table, column_name: str) -> int:
 
 
 def print_benchmark_tables(
-    out_dir: str,
-    field: str,
     filesizes: Dict[str, str],
     times: Dict[str, float],
     sizes: Dict[str, str],
@@ -286,8 +284,6 @@ def main():
 
     # Pretty tables
     print_benchmark_tables(
-        out_dir=args.out,
-        field=args.field,
         filesizes=filesizes,
         times=times,
         sizes=sizes,

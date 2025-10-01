@@ -44,7 +44,7 @@ def main(tmp_dir: str = "data/json_test"):
 
     # 2) Save as JSON (with schema) and JSONL (rows only)
     with open(json_path, "w", encoding="utf-8") as fp:
-        to_json(fp, table, include_schema=True, indent=2)
+        to_json(fp, table, indent=2)
 
     with open(jsonl_path, "w", encoding="utf-8") as fp:
         to_jsonl(fp, table)
@@ -64,7 +64,7 @@ def main(tmp_dir: str = "data/json_test"):
     # Optional: also test JSON without schema block
     json_no_schema = os.path.join(tmp_dir, "data_no_schema.json")
     with open(json_no_schema, "w", encoding="utf-8") as fp:
-        to_json(fp, table, include_schema=False, indent=2)
+        to_json(fp, table, indent=2)
     table_from_json2 = from_json(json_no_schema)
     rows_from_json2 = table_from_json2.to_pylist()
     assert rows_from_json2 == original_rows, "JSON (no schema) round-trip mismatch"

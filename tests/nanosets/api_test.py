@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 
 
-def main() -> None:
+def main():
     try:
         from datasets import load_dataset as hf_load_dataset  # pip install datasets
     except Exception:
