@@ -45,21 +45,3 @@ FMT = {
 PrimitiveType = Union[bool, int, float]
 INT32_MIN, INT32_MAX = -2_147_483_648, 2_147_483_647
 
-
-def is_primitive(dtype: DataType) -> bool:
-    """
-    Check if the given DataType is a primitive type.
-
-    Args:
-        dtype (DataType): The data type to check.
-
-    Returns:
-        bool: True if the data type is primitive, False otherwise.
-
-    Examples:
-        >>> is_primitive(INT32)
-        True
-        >>> is_primitive(STRING)
-        False
-    """
-    return dtype in NP_DATA_MAP

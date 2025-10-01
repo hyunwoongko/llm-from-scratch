@@ -1,15 +1,14 @@
 from typing import Optional, Dict, Any, List
 
 from nanorlhf.nanosets.base.bitmap import Bitmap
-from nanorlhf.nanosets.data_type.array import Array
-from nanorlhf.nanosets.data_type.builder import Builder
+from nanorlhf.nanosets.data_type.array import Array, ArrayBuilder
 from nanorlhf.nanosets.data_type.data_type import STRUCT
-from nanorlhf.nanosets.data_type.list_array import ListBuilder, infer_child_builder
-from nanorlhf.nanosets.data_type.primitive_array import infer_primitive_dtype, PrimitiveBuilder
-from nanorlhf.nanosets.data_type.string_array import StringBuilder
+from nanorlhf.nanosets.data_type.list_array import ListArrayBuilder, infer_child_builder
+from nanorlhf.nanosets.data_type.primitive_array import infer_primitive_dtype, PrimitiveArrayBuilder
+from nanorlhf.nanosets.data_type.string_array import StringArrayBuilder
 
 
-def get_struct_builder_from_rows(rows: List[Optional[Dict[str, Any]]]) -> "StructBuilder":
+def get_struct_array_builder_from_rows(rows: List[Optional[Dict[str, Any]]]) -> "StructArrayBuilder":
     """
     Infer and construct a StructBuilder for a nested struct field from dict-like rows.
 
@@ -38,12 +37,12 @@ def get_struct_builder_from_rows(rows: List[Optional[Dict[str, Any]]]) -> "Struc
             where each entry is a dict (row) or None.
 
     Returns:
-        StructBuilder: A builder configured with inferred field names and child builders.
+        StructArrayBuilder: A builder configured with inferred field names and child builders.
         Use `append(row)` for each input row and `finish()` to obtain a StructArray.
 
     Examples:
       >>> rows = [{"id": 1, "name": "a"}, None, {"id": 2}]
-      >>> sb = get_struct_builder_from_rows(rows)
+      >>> sb = get_struct_array_builder_from_rows(rows)
       >>> for r in rows:
       ...     sb.append(r)
       >>> arr = sb.finish()
@@ -63,7 +62,7 @@ def get_struct_builder_from_rows(rows: List[Optional[Dict[str, Any]]]) -> "Struc
     if not inner_names:
         # all None → default to empty struct with zero children (but still valid rows)
         # Education-friendly: make a struct with no fields; each append(None) still aligns lengths.
-        return StructBuilder([], [], strict_keys=True)
+        return StructArrayBuilder([], [], strict_keys=True)
 
     # Build inner columns to infer builders per inner field.
     num_rows = len(rows)
@@ -79,7 +78,7 @@ def get_struct_builder_from_rows(rows: List[Optional[Dict[str, Any]]]) -> "Struc
         inner_builder = inference_builder_for_column(inner_columns[name])
         inner_child_builders.append(inner_builder)
 
-    return StructBuilder(inner_names, inner_child_builders, strict_keys=True)
+    return StructArrayBuilder(inner_names, inner_child_builders, strict_keys=True)
 
 
 def inference_builder_for_column(values: List[Optional[Any]]):
@@ -93,7 +92,7 @@ def inference_builder_for_column(values: List[Optional[Any]]):
 
     Inference rules:
         -  dict:
-            → nested StructBuilder inferred via `get_struct_builder_from_rows(values)`
+            → nested StructBuilder inferred via `get_struct_array_builder_from_rows(values)`
         - list/tuple:
             → ListBuilder with child inferred by `infer_child_builder(values)`
         - str:
@@ -135,7 +134,7 @@ def inference_builder_for_column(values: List[Optional[Any]]):
 
     # All None → choose a sensible default (StringBuilder).
     if sample is None:
-        return StringBuilder()
+        return StringArrayBuilder()
 
     # dict → nested StructBuilder (recursive)
     if isinstance(sample, dict):
@@ -144,7 +143,7 @@ def inference_builder_for_column(values: List[Optional[Any]]):
                 continue
             if not isinstance(v, dict):
                 raise TypeError("Mixed types in struct field: expected dict or None.")
-        return get_struct_builder_from_rows(values)
+        return get_struct_array_builder_from_rows(values)
 
     # list/tuple → ListBuilder with inferred child builder
     if isinstance(sample, (list, tuple)):
@@ -154,7 +153,7 @@ def inference_builder_for_column(values: List[Optional[Any]]):
             if not isinstance(v, (list, tuple)):
                 raise TypeError("Mixed types in list field: expected list/tuple or None.")
         child_builder = infer_child_builder(values)  # uses your existing logic
-        return ListBuilder(child_builder)
+        return ListArrayBuilder(child_builder)
 
     # str → StringBuilder
     if isinstance(sample, str):
@@ -163,7 +162,7 @@ def inference_builder_for_column(values: List[Optional[Any]]):
                 continue
             if not isinstance(v, str):
                 raise TypeError("Mixed types in string field: expected str or None.")
-        return StringBuilder()
+        return StringArrayBuilder()
 
     # primitives → PrimitiveBuilder(dtype)
     if isinstance(sample, (bool, int, float)):
@@ -173,7 +172,7 @@ def inference_builder_for_column(values: List[Optional[Any]]):
             if not isinstance(v, (bool, int, float)):
                 raise TypeError("Mixed types in primitive field: expected bool/int/float or None.")
         dtype = infer_primitive_dtype(values)  # handles None entries
-        return PrimitiveBuilder(dtype)
+        return PrimitiveArrayBuilder(dtype)
 
     raise TypeError(f"Unsupported field type in struct: {type(sample).__name__}")
 
@@ -285,13 +284,13 @@ class StructArray(Array):
             child_builders.append(builder)
 
         # 4) Stream rows through a StructBuilder, then finish.
-        struct_builder = StructBuilder(field_names, child_builders, strict_keys=strict_keys)
+        struct_array_builder = StructArrayBuilder(field_names, child_builders, strict_keys=strict_keys)
         for row in data:
-            struct_builder.append(row)
-        return struct_builder.finish()
+            struct_array_builder.append(row)
+        return struct_array_builder.finish()
 
 
-class StructBuilder(Builder[Optional[Dict[str, Any]], StructArray]):
+class StructArrayBuilder(ArrayBuilder[Optional[Dict[str, Any]], StructArray]):
     """
     Incrementally builds a StructArray from dict-like rows.
 
@@ -301,14 +300,14 @@ class StructBuilder(Builder[Optional[Dict[str, Any]], StructArray]):
         strict_keys: If True, raising on unexpected keys in input rows. If False, ignore them.
 
     Example:
-        >>> from nanorlhf.nanosets.data_type.primitive_array import PrimitiveBuilder, INT64
-        >>> from nanorlhf.nanosets.data_type.string_array import StringBuilder
-        >>> from nanorlhf.nanosets.data_type.list_array import ListBuilder
+        >>> from nanorlhf.nanosets.data_type.primitive_array import PrimitiveArrayBuilder, INT64
+        >>> from nanorlhf.nanosets.data_type.string_array import StringArrayBuilder
+        >>> from nanorlhf.nanosets.data_type.list_array import ListArrayBuilder
         >>> names = ["id", "name", "tags"]
 
-        >>> sb = StructBuilder(
+        >>> sb = StructArrayBuilder(
         ...     names=["id", "name", "tags"],
-        ...     child_builders=[PrimitiveBuilder(INT64), StringBuilder(), ListBuilder(StringBuilder())],
+        ...     child_builders=[PrimitiveArrayBuilder(INT64), StringArrayBuilder(), ListArrayBuilder(StringArrayBuilder())],
         ... )
 
         >>> sb.append({"id": 1, "name": "alice", "tags": ["ml", "rl"]})
@@ -326,7 +325,7 @@ class StructBuilder(Builder[Optional[Dict[str, Any]], StructArray]):
     def __init__(
         self,
         names: List[str],
-        child_builders: List[Builder],
+        child_builders: List[ArrayBuilder],
         strict_keys: bool = True,
     ):
         if len(names) != len(child_builders):
@@ -337,17 +336,7 @@ class StructBuilder(Builder[Optional[Dict[str, Any]], StructArray]):
         self.strict_keys = strict_keys
         self.validity: List[int] = []
 
-    @classmethod
-    def from_mapping(cls, field_builders: Dict[str, Builder], strict_keys: bool = False) -> "StructBuilder":
-        """
-        Alternative constructor from an ordered mapping of name -> builder.
-        Python 3.7+ preserves dict insertion order, so field order will follow the mapping.
-        """
-        names = list(field_builders.keys())
-        child_builders = [field_builders[n] for n in names]
-        return cls(names, child_builders, strict_keys=strict_keys)
-
-    def append(self, row: Optional[Dict[str, Any]]) -> "StructBuilder":
+    def append(self, row: Optional[Dict[str, Any]]) -> "StructArrayBuilder":
         """
         Append one struct row (dict) or None (null row).
 

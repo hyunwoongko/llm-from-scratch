@@ -4,23 +4,22 @@ from typing import List
 
 from nanorlhf.nanosets.base.bitmap import Bitmap
 from nanorlhf.nanosets.base.buffer import Buffer
-from nanorlhf.nanosets.data_type.array import Array
-from nanorlhf.nanosets.data_type.builder import Builder
+from nanorlhf.nanosets.data_type.array import Array, ArrayBuilder
 from nanorlhf.nanosets.data_type.data_type import LIST, PrimitiveType
-from nanorlhf.nanosets.data_type.primitive_array import infer_primitive_dtype, PrimitiveBuilder
-from nanorlhf.nanosets.data_type.string_array import StringBuilder
+from nanorlhf.nanosets.data_type.primitive_array import infer_primitive_dtype, PrimitiveArrayBuilder
+from nanorlhf.nanosets.data_type.string_array import StringArrayBuilder
 
 ChildE = TypeVar("ChildE")
 
 
-def infer_child_builder(rows: List[Optional[Iterable[Any]]]) -> Builder:
+def infer_child_builder(rows: List[Optional[Iterable[Any]]]) -> ArrayBuilder:
     """
     Infer a builder for elements of a ListArray column.
 
     The function inspects the provided list rows and returns an appropriate builder:
       - Primitive elements (bool/int/float): `PrimitiveBuilder(infer_primitive_dtype(...))`
-      - String elements (str): `StringBuilder()`
-      - Nested lists: `ListBuilder(infer_child_builder(rewritten_inner_rows))`
+      - String elements (str): `StringArrayBuilder()`
+      - Nested lists: `ListArrayBuilder(infer_child_builder(rewritten_inner_rows))`
       - Dict elements: Not supported yet (raises NotImplementedError)
 
     Args:
@@ -49,7 +48,7 @@ def infer_child_builder(rows: List[Optional[Iterable[Any]]]) -> Builder:
     # 2.1. Nested lists
     if isinstance(sample, (list, tuple)):
         # Build "inner rows":
-        #     each child list becomes one inner row for the nested ListBuilder.
+        #     each child list becomes one inner row for the nested ListArrayBuilder.
         inner_rows: List[Optional[Iterable[Any]]] = []
         for r in rows:
             if r is None:
@@ -64,13 +63,23 @@ def infer_child_builder(rows: List[Optional[Iterable[Any]]]) -> Builder:
                         f"Expected nested list elements, found {type(sub).__name__}"
                     )
         inner_child = infer_child_builder(inner_rows)
-        return ListBuilder(inner_child)
+        return ListArrayBuilder(inner_child)
 
-    # 2.2. Dict → struct (not supported yet)
+    # 2.2. Dict → struct
     if isinstance(sample, dict):
-        raise NotImplementedError(
-            "Dict elements (struct) are not yet supported in infer_child_builder()."
-        )
+        dict_elems: List[Optional[dict]] = []
+        for row in rows:
+            if row is None:
+                continue
+            for elem in row:
+                if elem is None:
+                    dict_elems.append(None)
+                elif isinstance(elem, dict):
+                    dict_elems.append(elem)
+                else:
+                    raise TypeError(f"Mixed element types: expected dict, got {type(elem).__name__}")
+        from nanorlhf.nanosets.data_type.struct_array import get_struct_array_builder_from_rows
+        return get_struct_array_builder_from_rows(dict_elems)
 
     # 2.3. Strings
     if isinstance(sample, str):
@@ -85,7 +94,7 @@ def infer_child_builder(rows: List[Optional[Iterable[Any]]]) -> Builder:
                     raise TypeError(
                         f"Mixed element types: expected str, got {type(e).__name__}"
                     )
-        return StringBuilder()
+        return StringArrayBuilder()
 
     # 2.4. Primitives (bool/int/float)
     if isinstance(sample, (bool, int, float)):
@@ -107,7 +116,7 @@ def infer_child_builder(rows: List[Optional[Iterable[Any]]]) -> Builder:
 
         # Decide BOOL / INT64 / FLOAT64
         dt = infer_primitive_dtype(prims)
-        return PrimitiveBuilder(dt)
+        return PrimitiveArrayBuilder(dt)
 
     # 2.5. Otherwise unsupported
     raise TypeError(f"Unsupported element type for list: {type(sample).__name__}")
@@ -212,11 +221,11 @@ class ListArray(Array):
         Build a ListArray from a Python list of iterables (or None), with type inference.
 
         This function infers the element type of the list column and constructs a
-        `ListBuilder` with an appropriate child builder:
+        `ListArrayBuilder` with an appropriate child builder:
 
         - Primitive elements (bool/int/float): `PrimitiveBuilder(infer_primitive_dtype(...))`
-        - String elements (str): `StringBuilder()`
-        - Nested lists: `ListBuilder(<recursively inferred child builder>)`
+        - String elements (str): `StringArrayBuilder()`
+        - Nested lists: `ListArrayBuilder(<recursively inferred child builder>)`
         - Dict elements: Not yet supported (raises NotImplementedError)
 
         Args:
@@ -233,49 +242,49 @@ class ListArray(Array):
             >>> strings = ListArray.from_pylist([["foo", "bar"], None, ["baz"]])
         """
         child_builder = infer_child_builder(data)
-        list_builder = ListBuilder(child_builder)
+        array_builder = ListArrayBuilder(child_builder)
         for row in data:
-            list_builder.append(row)
+            array_builder.append(row)
             # row can be None (null list) or any iterable (including empty)
-        return list_builder.finish()
+        return array_builder.finish()
 
 
-class ListBuilder(Builder[Iterable[ChildE], ListArray]):
+class ListArrayBuilder(ArrayBuilder[Iterable[ChildE], ListArray]):
     """
-    ListBuilder incrementally builds a ListArray
+    ListArrayBuilder incrementally builds a ListArray
     for arbitrary element types by composing a child builder.
 
     The child builder is responsible for appending elements of the list,
-    while this ListBuilder manages list row boundaries (offsets) and nulls (validity bitmap).
+    while this ListArrayBuilder manages list row boundaries (offsets) and nulls (validity bitmap).
 
     Args:
         child_builder (Builder): builder for the child element type
 
     Discussion:
-        Q. How is this similar to StringBuilder?
+        Q. How is this similar to StringArrayBuilder?
             They share the same architectural pattern:
               1) Maintain cumulative offsets of length n+1 starting at 0.
               2) Track per-row validity and pack it into a 1-bit bitmap via _pack_bitmap.
               3) Freeze internal buffers on finish() to produce an immutable Array.
 
             In short:
-                - StringBuilder
+                - StringArrayBuilder
                     offsets: int32[n+1] over UTF-8 byte length
                     values : uint8 flat byte buffer of all strings
                     finish : returns StringArray(offsets, values, validity)
 
-                - ListBuilder
+                - ListArrayBuilder
                     offsets: int32[n+1] over element counts per list row
                     values : produced by value_builder.finish() — an arbitrary child Array
                     finish : returns ListArray(offsets, child, validity)
     """
 
-    def __init__(self, child_builder: Builder):
+    def __init__(self, child_builder: ArrayBuilder):
         self.child_builder = child_builder
         self.offsets = [0]
         self.validity = []
 
-    def append(self, seq: Optional[Iterable[Any]]) -> "ListBuilder":
+    def append(self, seq: Optional[Iterable[Any]]) -> "ListArrayBuilder":
         """
         Append a single list (or None) to the builder.
 
@@ -283,7 +292,7 @@ class ListBuilder(Builder[Iterable[ChildE], ListArray]):
             seq (Optional[Iterable[Any]]): list to append, or None for null
 
         Returns:
-            ListBuilder: self for method chaining
+            ListArrayBuilder: self for method chaining
         """
         if seq is None:
             self.validity.append(0)

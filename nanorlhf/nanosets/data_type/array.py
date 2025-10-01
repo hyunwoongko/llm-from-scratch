@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional
+from typing import TypeVar, Generic
 
 from nanorlhf.nanosets.base.bitmap import Bitmap
 from nanorlhf.nanosets.data_type.data_type import DataType
@@ -64,5 +65,45 @@ class Array(ABC):
 
         Returns:
             Array: Converted Array
+        """
+        raise NotImplementedError
+
+
+# element type
+E = TypeVar('E')
+
+# array type
+# - bound=Array: `A` must be a subclass of Array
+# - covariant=True: `A` can be a more derived type than specified
+A = TypeVar('A', bound=Array, covariant=True)
+
+
+class ArrayBuilder(Generic[E, A], ABC):
+    """
+    Abstract base class for all array builder classes.
+    When we build an arbitrary array, we usually don't know the length in advance.
+    So we use a builder to incrementally build the array.
+    """
+
+    @abstractmethod
+    def append(self, value: E) -> "ArrayBuilder[E, A]":
+        """
+        Append a single value to the builder.
+
+        Args:
+            value (E): value to append
+
+        Returns:
+            ArrayBuilder: self for method chaining
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def finish(self) -> A:
+        """
+        Finalize the builder and return the built array.
+
+        Returns:
+            A: built array
         """
         raise NotImplementedError

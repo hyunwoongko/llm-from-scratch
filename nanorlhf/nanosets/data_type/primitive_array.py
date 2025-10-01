@@ -3,20 +3,19 @@ from typing import List, Optional
 
 from nanorlhf.nanosets.base.bitmap import Bitmap
 from nanorlhf.nanosets.base.buffer import Buffer
-from nanorlhf.nanosets.data_type.array import Array
-from nanorlhf.nanosets.data_type.builder import Builder
+from nanorlhf.nanosets.data_type.array import Array, ArrayBuilder
 from nanorlhf.nanosets.data_type.data_type import (
     DataType,
     PrimitiveType,
     FMT,
     BOOL,
+    INT32,
     INT64,
     INT32_MIN,
     INT32_MAX,
     FLOAT32,
     FLOAT64,
 )
-from nanorlhf.nanosets.data_type.data_type import INT32
 
 
 def infer_primitive_dtype(vals: List[Optional[PrimitiveType]]) -> DataType:
@@ -126,7 +125,7 @@ class PrimitiveArray(Array):
         dtype: Optional[DataType] = None,
     ) -> "PrimitiveArray":
         """
-        Build a PrimitiveArray from a Python list of scalars using PrimitiveBuilder.
+        Build a PrimitiveArray from a Python list of scalars using PrimitiveArrayBuilder.
 
         Args:
             data: A list of Python scalars (bool/int/float) or None for nulls.
@@ -143,8 +142,8 @@ class PrimitiveArray(Array):
         if target not in FMT:
             raise TypeError(f"Unsupported dtype for PrimitiveArray: {target}")
 
-        # 2) Build using the existing PrimitiveBuilder (values must be pre-validated here)
-        b = PrimitiveBuilder(target)
+        # 2) Build using the existing PrimitiveArrayBuilder (values must be pre-validated here)
+        b = PrimitiveArrayBuilder(target)
 
         if target is BOOL:
             for v in data:
@@ -193,7 +192,7 @@ class PrimitiveArray(Array):
         return b.finish()
 
 
-class PrimitiveBuilder(Builder[PrimitiveType, PrimitiveArray]):
+class PrimitiveArrayBuilder(ArrayBuilder[PrimitiveType, PrimitiveArray]):
     """
     Builder for constructing PrimitiveArray incrementally.
 
@@ -208,7 +207,7 @@ class PrimitiveBuilder(Builder[PrimitiveType, PrimitiveArray]):
         self.values: List[PrimitiveType] = []
         self.validity: List[int] = []
 
-    def append(self, x: Optional[PrimitiveType]) -> "PrimitiveBuilder":
+    def append(self, x: Optional[PrimitiveType]) -> "PrimitiveArrayBuilder":
         """
         Append a value to the builder. Use None for nulls.
 
@@ -216,7 +215,7 @@ class PrimitiveBuilder(Builder[PrimitiveType, PrimitiveArray]):
             x (Optional[Prim]): value to append, or None for null
 
         Returns:
-            PrimitiveBuilder: self for chaining
+            PrimitiveArrayBuilder: self for chaining
         """
         if x is None:
             self.validity.append(0)

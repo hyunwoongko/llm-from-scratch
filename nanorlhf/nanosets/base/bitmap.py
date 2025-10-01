@@ -10,7 +10,7 @@ class Bitmap:
 
     Args:
         size (int): The number of elements the bitmap can hold.
-        buf (Optional[Buffer]): Optional buffer to initialize the bitmap from.
+        buffer (Optional[Buffer]): Optional buffer to initialize the bitmap from.
 
     Notes:
         It stores 1 for valid values and 0 for nulls.
@@ -99,21 +99,21 @@ class Bitmap:
             ensuring that sequential reads fully benefit from CPU caching and memory prefetching.
     """
 
-    def __init__(self, size: int, buf: Optional[Buffer] = None):
+    def __init__(self, size: int, buffer: Optional[Buffer] = None):
         self.num_bits = int(size)
         # 1 byte is 8 bits, and `(size + 7) // 8` computes
         # the number of bytes needed to store `size` bits.
         num_bytes = (self.num_bits + 7) // 8
 
-        if buf is None:
+        if buffer is None:
             # allocate writable storage
-            self.buf = Buffer.from_bytearray(bytearray(num_bytes))
+            self.buffer = Buffer.from_bytearray(bytearray(num_bytes))
         else:
-            if len(buf.data) < num_bytes:
+            if len(buffer.data) < num_bytes:
                 raise ValueError(
-                    f"Bitmap buffer too small: need {num_bytes} bytes, got {len(buf.data)}"
+                    f"Bitmap buffer too small: need {num_bytes} bytes, got {len(buffer.data)}"
                 )
-            self.buf = buf  # may be read-only if it wraps `bytes`
+            self.buffer = buffer  # may be read-only if it wraps `bytes`
 
     def _check_bounds(self, i: int) -> None:
         """
@@ -127,7 +127,7 @@ class Bitmap:
 
     def _ensure_writable(self) -> None:
         """Ensure the bitmap buffer is writable."""
-        if self.buf.data.readonly:
+        if self.buffer.data.readonly:
             raise RuntimeError("Bitmap buffer is read-only; cannot mutate bits.")
 
     def set_valid(self, i: int, valid: bool = True):
@@ -157,11 +157,11 @@ class Bitmap:
 
             Q. How are bitwise operations used here?
                 - To set a bit to 1 (mark valid):
-                    self.buf.data[byte] |= (1 << bit)
+                    self.buffer.data[byte] |= (1 << bit)
                     The OR operator (|) turns that bit to 1 while keeping other bits unchanged.
 
                 - To clear a bit to 0 (mark null):
-                    self.buf.data &= ~(1 << bit) & 0xFF
+                    self.buffer.data &= ~(1 << bit) & 0xFF
                     The NOT (~) flips the mask bits (so only the target bit becomes 0),
                     and AND (&) keeps all other bits intact.
 
@@ -197,12 +197,12 @@ class Bitmap:
 
         # `divmod` returns (quotient=몫, remainder=나머지) as a tuple
         byte, bit = divmod(i, 8)
-        b = self.buf.data[byte]
+        b = self.buffer.data[byte]
         if valid:
             b |= (1 << bit)
         else:
             b &= ~(1 << bit) & 0xFF
-        self.buf.data[byte] = b
+        self.buffer.data[byte] = b
 
     def is_valid(self, i: int) -> bool:
         """
@@ -226,7 +226,7 @@ class Bitmap:
 
                 >>> byte, bit = divmod(i, 8)
                 >>> mask = (1 << bit)
-                >>> (self.buf.data[byte] & mask) != 0
+                >>> (self.buffer.data[byte] & mask) != 0
 
                 If the result is nonzero, the bit is 1 (valid).
                 If it is zero, the bit is 0 (null).
@@ -244,7 +244,7 @@ class Bitmap:
         """
         self._check_bounds(i)
         byte, bit = divmod(i, 8)
-        return (self.buf.data[byte] & (1 << bit)) != 0
+        return (self.buffer.data[byte] & (1 << bit)) != 0
 
     @classmethod
     def from_pylist(cls, bits: List[int]) -> Optional["Bitmap"]:

@@ -3,8 +3,7 @@ from typing import Optional, List
 
 from nanorlhf.nanosets.base.bitmap import Bitmap
 from nanorlhf.nanosets.base.buffer import Buffer
-from nanorlhf.nanosets.data_type.array import Array
-from nanorlhf.nanosets.data_type.builder import Builder
+from nanorlhf.nanosets.data_type.array import Array, ArrayBuilder
 from nanorlhf.nanosets.data_type.data_type import STRING
 
 
@@ -182,7 +181,7 @@ class StringArray(Array):
 
         Discussion:
             Q. How does this function work internally?
-                This method uses the StringBuilder to incrementally build the StringArray.
+                This method uses the StringArrayBuilder to incrementally build the StringArray.
                 It iterates through each element in the input Python list:
                 - If the element is a valid string, it appends it to the builder.
                 - If the element is None, it appends a null to the builder.
@@ -196,13 +195,13 @@ class StringArray(Array):
                 >>> print(string_array.to_pylist())
                 ["hello", None, "world"]
         """
-        builder = StringBuilder()
+        array_builder = StringArrayBuilder()
         for s in data:
-            builder.append(s)
-        return builder.finish()
+            array_builder.append(s)
+        return array_builder.finish()
 
 
-class StringBuilder(Builder[str, StringArray]):
+class StringArrayBuilder(ArrayBuilder[str, StringArray]):
     """
     A simple builder to incrementally construct a column of UTF-8 strings.
 
@@ -236,7 +235,7 @@ class StringBuilder(Builder[str, StringArray]):
         # Validity flags, 1 = valid, 0 = null.
         self.validity: List[int] = []
 
-    def append(self, s: Optional[str]) -> "StringBuilder":
+    def append(self, s: Optional[str]) -> "StringArrayBuilder":
         """
         Append a string or None to the builder.
         Returns self for method chaining.
@@ -245,7 +244,7 @@ class StringBuilder(Builder[str, StringArray]):
             s (Optional[str]): The string to append, or None for a null value.
 
         Returns:
-            StringBuilder: self
+            StringArrayBuilder: self
 
         Discussion:
             Q. How does this work internally?
@@ -271,7 +270,7 @@ class StringBuilder(Builder[str, StringArray]):
             return self
 
         if not isinstance(s, str):
-            raise TypeError(f"StringBuilder.append expects str or None, got {type(s).__name__}")
+            raise TypeError(f"StringArrayBuilder.append expects str or None, got {type(s).__name__}")
 
         b = s.encode("utf-8")
         self.values.extend(b)
