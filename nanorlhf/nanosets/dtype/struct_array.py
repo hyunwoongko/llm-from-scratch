@@ -62,7 +62,7 @@ def get_struct_array_builder_from_rows(rows: List[Optional[Dict[str, Any]]]) -> 
     if not inner_names:
         # all None → default to empty struct with zero children (but still valid rows)
         # Education-friendly: make a struct with no fields; each append(None) still aligns lengths.
-        return StructArrayBuilder([], [], strict_keys=True)
+        return StructArrayBuilder([], [], strict_keys=False)
 
     # Build inner columns to infer builders per inner field.
     num_rows = len(rows)
@@ -78,7 +78,7 @@ def get_struct_array_builder_from_rows(rows: List[Optional[Dict[str, Any]]]) -> 
         inner_builder = inference_builder_for_column(inner_columns[name])
         inner_child_builders.append(inner_builder)
 
-    return StructArrayBuilder(inner_names, inner_child_builders, strict_keys=True)
+    return StructArrayBuilder(inner_names, inner_child_builders, strict_keys=False)
 
 
 def inference_builder_for_column(values: List[Optional[Any]]):
@@ -111,10 +111,6 @@ def inference_builder_for_column(values: List[Optional[Any]]):
 
     Returns:
       Builder: An initialized builder for this field’s data type.
-
-    Raises:
-      TypeError: If non-None entries mix incompatible categories (e.g., str and int),
-        or contain an unsupported type.
 
     Examples:
       >>> inference_builder_for_column([1, None, 2])

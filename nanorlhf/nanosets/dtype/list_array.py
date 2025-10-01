@@ -17,10 +17,10 @@ def infer_child_builder(rows: List[Optional[Iterable[Any]]]) -> ArrayBuilder:
     Infer a builder for elements of a ListArray column.
 
     The function inspects the provided list rows and returns an appropriate builder:
-      - Primitive elements (bool/int/float): `PrimitiveBuilder(infer_primitive_dtype(...))`
+      - Primitive elements (bool/int/float): `PrimitiveArrayBuilder(infer_primitive_dtype(...))`
       - String elements (str): `StringArrayBuilder()`
       - Nested lists: `ListArrayBuilder(infer_child_builder(rewritten_inner_rows))`
-      - Dict elements: Not supported yet (raises NotImplementedError)
+      - Dict elements: `StructArrayBuilder(<inferred struct fields>)`
 
     Args:
       rows (List[Optional[Iterable[Any]]]): A list where each item is an iterable (list/tuple)
@@ -223,10 +223,10 @@ class ListArray(Array):
         This function infers the element type of the list column and constructs a
         `ListArrayBuilder` with an appropriate child builder:
 
-        - Primitive elements (bool/int/float): `PrimitiveBuilder(infer_primitive_dtype(...))`
+        - Primitive elements (bool/int/float): `PrimitiveArrayBuilder(infer_primitive_dtype(...))`
         - String elements (str): `StringArrayBuilder()`
         - Nested lists: `ListArrayBuilder(<recursively inferred child builder>)`
-        - Dict elements: Not yet supported (raises NotImplementedError)
+        - Dict elements: `StructArrayBuilder(<inferred struct fields>)`
 
         Args:
             data (List[Optional[Iterable[Any]]]): A list where each item is an iterable (list/tuple)

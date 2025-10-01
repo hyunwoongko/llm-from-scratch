@@ -85,7 +85,7 @@ def write_table(fp, table: Table):
         meta = {"dtype": dtype_meta(arr.dtype), "length": arr.length}
 
         if arr.validity is not None:
-            meta["validity"] = add_buf(arr.validity.buf)
+            meta["validity"] = add_buf(arr.validity.buffer)
 
         if isinstance(arr, PrimitiveArray):
             meta["kind"] = "primitive"

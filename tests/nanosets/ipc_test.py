@@ -19,7 +19,7 @@ def gen_rows(n=1000):
     return rows
 
 
-def main(tmp_dir="nanosets/ipc_test"):
+def main(tmp_dir="data/ipc_test"):
     os.makedirs(tmp_dir, exist_ok=True)
     path = os.path.join(tmp_dir, "table.nano")
 

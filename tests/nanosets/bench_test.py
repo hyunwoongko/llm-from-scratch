@@ -205,64 +205,10 @@ def print_benchmark_tables(
     print(tabulate(rows, headers=headers, tablefmt="github"))
 
 
-def print_rationale(field: str):
-    """Print a conceptual rationale for the benchmark results in English."""
-    rationale = f"""
-Why do we see fast initial reads with NANO-IPC but different partial-access behavior?
-
-1) Initial read
-   • JSON/JSONL
-     - The entire file is parsed up front into Python dict/list/str/number objects.
-     - Tokenization, UTF-8 decoding, and many object allocations happen immediately.
-     - Higher wall time and memory churn at load time.
-
-   • JSONL (streaming)
-     - Still must scan the whole file line-by-line and parse each JSON line.
-     - Avoids building a giant in-memory object graph, but CPU work (tokenization/decoding)
-       is performed for every record, and I/O ≈ file size.
-     - Good for low-memory pipelines, not necessarily faster in wall time.
-
-   • NANO-IPC
-     - Parses a tiny JSON header and memory-maps raw column buffers (zero-copy).
-     - No per-value parsing or Python object allocation up front.
-     - Demand paging pulls in only the touched pages, so initial read is very fast.
-
-2) Partial access (extracting one field)
-   • JSON/JSONL
-     - Data is already fully materialized as Python objects in memory.
-     - Selecting a single field is basically an O(n) list comprehension with minimal extra cost.
-
-   • JSONL (streaming)
-     - You don’t materialize the whole file in memory, but you still parse every line,
-       decode tokens, and touch ~all bytes of the file to pick out one field.
-     - Wall time grows with file size; memory is modest, CPU is the bottleneck.
-
-   • NANO-IPC
-     - Columns remain as byte buffers until requested. For the selected column only:
-       numbers → struct.unpack loops; strings → use offsets, slice bytes, UTF-8 decode.
-     - Crucially, *other columns are never parsed or touched at all*.
-     - This is why NANO-IPC often beats JSONL (streaming) for single-field extraction:
-       streaming must parse the entire JSON text, whereas NANO-IPC slices the exact column buffers.
-     - Numeric columns tend to be especially fast; strings/nested types pay decoding/assembly costs,
-       but still avoid scanning unrelated columns.
-
-3) Takeaways
-   • If you explore a few columns repeatedly or want zero-copy interop, NANO-IPC is ideal:
-     tiny initial read + pay-as-you-go materialization for only the columns you need.
-   • If you want one-shot conversion to Python objects for *all* fields, JSON/JSONL pays its cost up front,
-     making subsequent per-field access trivial.
-   • JSONL (streaming) is great for constrained-memory pipelines, but it must parse every record,
-     so it’s typically slower than NANO-IPC for single-field extraction.
-   • The exact gap depends on the selected column type.
-   
-(Selected field in this run: '{field}')""".rstrip()
-    print(rationale)
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--rows", type=int, default=100_000, help="rows to generate if files are absent")
-    ap.add_argument("--out", type=str, default="nanosets/bench_test", help="output directory (data storage)")
+    ap.add_argument("--out", type=str, default="data/bench_test", help="output directory (data storage)")
     ap.add_argument("--field", type=str, default="name", help="field/column to partially read")
     ap.add_argument("--verify", action="store_true", help="verify equality across formats for the requested field")
     args = ap.parse_args()
@@ -346,7 +292,6 @@ def main():
         times=times,
         sizes=sizes,
     )
-    print_rationale(field=args.field)
 
 
 if __name__ == "__main__":

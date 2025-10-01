@@ -32,7 +32,7 @@ def generate_rows(n: int = 1000) -> List[Optional[Dict[str, Any]]]:
     return rows
 
 
-def main(tmp_dir: str = "nanosets/json_test"):
+def main(tmp_dir: str = "data/json_test"):
     os.makedirs(tmp_dir, exist_ok=True)
     json_path = os.path.join(tmp_dir, "data.json")
     jsonl_path = os.path.join(tmp_dir, "data.jsonl")
