@@ -1,0 +1,122 @@
+import base64
+import json
+from typing import Dict, Any, Optional
+from urllib import request
+
+from nanorlhf.nanoray.core.object_ref import ObjectRef
+from nanorlhf.nanoray.core.serialization import dumps
+from nanorlhf.nanoray.core.task_spec import TaskSpec
+from nanorlhf.nanoray.network.router import NodeRegistry
+
+
+class RpcClient:
+    """
+    Minimal HTTP JSON RPC client.
+
+    Args:
+        registry (NodeRegistry): node_id -> (address, token)
+        timeout_s (float): per-request timeout.
+        retries (int): number of total attempts (>= 1).
+    """
+
+    def __init__(self, registry: NodeRegistry, timeout_s: float = 10.0, retries: int = 3):
+        self._reg = registry
+        self._timeout = float(timeout_s)
+        self._retries = max(1, int(retries))
+
+    def _request(self, node_id: str, path: str, body: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Internal: send a JSON-RPC request to a node.
+
+        Args:
+            node_id (str): target node ID
+            path (str): URL path (e.g., "/rpc/get_object")
+            body (Dict[str, Any]): JSON-serializable request body
+
+        Returns:
+            Dict[str, Any]: JSON-deserialized response body
+        """
+        address, token = self._reg.get(node_id)
+        url = f"{address}{path}"
+        data = json.dumps(body).encode("utf-8")
+
+        req = request.Request(
+            url=url,
+            data=data,
+            headers={
+                "Content-Type": "application/json",
+                "Content-Length": f"{len(data)}",
+            },
+        )
+        if token:
+            req.add_header("Authorization", f"Bearer {token}")
+
+        last_exc: Optional[Exception] = None
+
+        for _ in range(self._retries):
+            try:
+                with request.urlopen(req, timeout=self._timeout) as resp:
+                    raw = resp.read()
+                    return json.loads(raw)
+            except Exception as e:
+                last_exc = e
+                continue
+
+        raise RuntimeError(f"RPC request failed to {url}: {last_exc}")
+
+    def get_object(self, node_id: str, object_id: str) -> bytes:
+        """
+        Fetch serialized object bytes from a remote node.
+
+        Args:
+            node_id (str): target node ID
+            object_id (str): target object ID
+
+        Returns:
+            bytes: Raw object bytes
+        """
+        res = self._request(
+            node_id=node_id,
+            path="/rpc/get_object",
+            body={"object_id": object_id},
+        )
+
+        if not res.get("ok"):
+            err_msg = res.get("error", "unknown error")
+            raise RuntimeError(f"Remote get_object failed: {err_msg}")
+        return base64.b64decode(res["payload_b64"])
+
+    def execute_task(self, node_id: str, task_spec: TaskSpec) -> ObjectRef:
+        """
+        Send a task execution request to a remote node.
+
+        Args:
+            node_id (str): target node ID
+            task_spec (Dict[str, Any]): Task specification dictionary
+
+        Returns:
+            Dict[str, Any]: Task execution result
+        """
+        blob = dumps(task_spec)
+
+        res = self._request(
+            node_id=node_id,
+            path="/rpc/execute_task",
+            body={"spec_b64": base64.b64encode(blob).decode("ascii")},
+        )
+
+        if not res.get("ok"):
+            err_msg = res.get("error", "unknown error")
+            remote_tb = res.get("traceback")
+            raise RuntimeError(
+                f"Remote execute_task failed: {err_msg}\n"
+                f"--- Remote Traceback ---\n"
+                f"{remote_tb}"
+            )
+
+        ref_info = res["ref"]
+        return ObjectRef(
+            object_id=ref_info["object_id"],
+            owner_node_id=ref_info["owner_node_id"],
+            size_bytes=ref_info.get("size_bytes"),
+        )

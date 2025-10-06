@@ -12,7 +12,7 @@ def get_struct_array_builder_from_rows(rows: List[Optional[Dict[str, Any]]]) -> 
     """
     Infer and construct a `StructArrayBuilder` for a nested struct field from dict-like rows.
 
-    Parameters:
+    Args:
         rows (List[Optional[Dict[str, Any]]]): Column values for a nested struct field,
             where each entry is a `dict` (row) or `None`.
 
@@ -82,7 +82,7 @@ def inference_builder_for_column(values: List[Optional[Any]]):
     """
     Return a builder for a single struct field (column) by inspecting its values.
 
-    Parameters:
+    Args:
         values (List[Optional[Any]]): Column-aligned values for a single field.
             Use `None` for missing entries at any row.
 
@@ -337,7 +337,7 @@ class StructArrayBuilder(ArrayBuilder[Optional[Dict[str, Any]], StructArray]):
         """
         Append one struct row (`dict`) or `None` (null row).
 
-        Parameters:
+        Args:
             row (Optional[Dict[str, Any]]): Input row or `None`.
 
         Discussion:

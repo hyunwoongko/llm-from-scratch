@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nanorlhf"
+version = "0.1.0"
+description = "nanorlhf: from-scratch journey into how LLMs and RLHF really work."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+keywords = ["rlhf", "rl", "llm", "language model", "deep learning", "ai"]
+dependencies = [
+  "torch",
+  "triton",
+  "cloudpickle",
+  "zstandard",
+]
+
+[project.urls]
+Homepage = "https://github.com/hyunwoongko/nanorlhf"
+Repository = "https://github.com/hyunwoongko/nanorlhf"
+
+[tool.setuptools.packages.find]
+include = ["nanorlhf*"]

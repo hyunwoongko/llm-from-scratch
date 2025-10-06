@@ -14,20 +14,22 @@ ChildE = TypeVar("ChildE")
 
 def infer_child_builder(rows: List[Optional[Iterable[Any]]]) -> ArrayBuilder:
     """
-    Infer a builder for elements of a ListArray column.
-
-    The function inspects the provided list rows and returns an appropriate builder:
-      - Primitive elements (bool/int/float): `PrimitiveArrayBuilder(infer_primitive_dtype(...))`
-      - String elements (str): `StringArrayBuilder()`
-      - Nested lists: `ListArrayBuilder(infer_child_builder(rewritten_inner_rows))`
-      - Dict elements: `StructArrayBuilder(<inferred struct fields>)`
+    Infer a builder for elements of a `ListArray` column.
 
     Args:
-      rows (List[Optional[Iterable[Any]]]): A list where each item is an iterable (list/tuple)
-          of child elements, or None to represent a null list.
+        rows (List[Optional[Iterable[Any]]]): A list where each item is an iterable
+            (list/tuple) of child elements, or `None` to represent a null list.
 
     Returns:
-      `Builder`: A builder instance suitable for the list's element type.
+        Builder: A builder instance suitable for the list's element type.
+
+    Discussion:
+        Q. How does this function work?
+            The function inspects the provided list rows and returns an appropriate builder:
+              - Primitive elements (`bool`/`int`/`float`): `PrimitiveArrayBuilder(infer_primitive_dtype(...))`
+              - String elements (`str`): `StringArrayBuilder()`
+              - Nested lists: `ListArrayBuilder(infer_child_builder(rewritten_inner_rows))`
+              - Dict elements: `StructArrayBuilder(<inferred struct fields>)`
     """
     # 1. Find a representative non-null element to choose a branch.
     sample: Any = None
@@ -124,40 +126,38 @@ def infer_child_builder(rows: List[Optional[Iterable[Any]]]) -> ArrayBuilder:
 
 class ListArray(Array):
     """
-    ListArray is an Array that holds variable-length lists of elements.
-    It's conceptually similar to StringArray, but instead of strings,
-    it holds lists of arbitrary elements.
+    `ListArray` holds variable-length lists of elements.
 
     Args:
-        offsets (np.ndarray): start and end positions boundaries of each list
-        values (Array): child array holding the actual list elements
-        validity (Optional[Bitmap]): validity bitmap, if None all elements are valid
+        offsets (Buffer): Start/end position boundaries of each list.
+        values (Array): Child array holding the actual list elements.
+        validity (Optional[Bitmap]): Validity bitmap; if `None` all elements are valid.
 
     Discussion:
-        Q. How is this similar to StringArray?
-            Both ListArray and StringArray use the same "offsets + values" pattern.
+        Q. How is this similar to `StringArray`?
+            Both `ListArray` and `StringArray` use the same "offsets + values" pattern.
 
-            - StringArray
-                - offsets: int32[n+1]
-                - values : uint8 buffer holding all UTF-8 bytes
-                - element i = bytes[offsets[i] : offsets[i+1]]
+            - `StringArray`
+                - offsets: `int32[n+1]`
+                - values : `uint8` buffer holding all UTF-8 bytes
+                - element `i` = `bytes[offsets[i] : offsets[i+1]]`
 
-            - ListArray
-                - offsets: int32[n+1]
-                - values : a *child Array* that concatenates all list items
-                - element i = child[offsets[i] : offsets[i+1]]  (a sublist)
+            - `ListArray`
+                - offsets: `int32[n+1]`
+                - values : a *child `Array`* that concatenates all list items
+                - element `i` = `child[offsets[i] : offsets[i+1]]`  (a sublist)
 
-            Example (ListArray):
+            Example (`ListArray`):
                 Suppose `values = [10, 11, 12, 13, 14]` and `offsets = [0, 2, 5]`.
 
                 Then:
-                  row 0 -> values[0:2] -> [10, 11]
-                  row 1 -> values[2:5] -> [12, 13, 14]
+                  row 0 -> `values[0:2]` -> `[10, 11]`
+                  row 1 -> `values[2:5]` -> `[12, 13, 14]`
 
-            The key difference is that StringArray's `values` is a primitive
-            byte buffer (np.uint8) for text, whereas ListArray's `values` is an arbitrary Array.
-            It can itself be a PrimitiveArray, StringArray, another ListArray, or a StructArray.
-            This makes nested structures like List<List<int32>> or List<Struct{...}> natural.
+            The key difference is that `StringArray`'s `values` is a primitive
+            byte buffer (`np.uint8`) for text, whereas `ListArray`'s `values` is an arbitrary `Array`.
+            It can itself be a `PrimitiveArray`, `StringArray`, another `ListArray`, or a `StructArray`.
+            This makes nested structures like `List<List<int32>>` or `List<Struct{...}>` natural.
     """
 
     def __init__(self, offsets: Buffer, values: Array, validity: Optional[Bitmap] = None):
@@ -177,31 +177,34 @@ class ListArray(Array):
 
     def offset_at(self, i: int) -> int:
         """
-        Read int32 offset[i] (little-endian) without NumPy.
+        Read `int32` `offset[i]` (little-endian) without NumPy.
 
         Args:
-            i (int): index of the offset to read
+            i (int): Index of the offset to read.
 
         Returns:
-            int: the i-th offset value
+            int: The `i`-th offset value.
         """
         return struct.unpack_from("<i", self.offsets.data, i * 4)[0]
 
     def to_pylist(self) -> List[Optional[List]]:
         """
-        Convert the ListArray to a Python list of lists, respecting null values.
+        Convert the `ListArray` to a Python list of lists, respecting null values.
 
         Returns:
-            List: Python list representation of the array
+            List[Optional[List]]: Python list representation of the array.
 
-        Notes:
-            This supposes 2D lists. For example, if the ListArray represents
-            [1, 2, None, 3, 4, 5] with offsets [0, 2, 2, 5], the output will be:
-            [
-                [1, 2],
-                None,
-                [3, 4, 5]
-            ]
+        Discussion:
+            Q. How does this method work?
+                This supposes 2D lists. For example, if the `ListArray` represents
+                `[1, 2, None, 3, 4, 5]` with offsets `[0, 2, 2, 5]`, the output will be:
+                ```
+                [
+                    [1, 2],
+                    None,
+                    [3, 4, 5]
+                ]
+                ```
         """
         output = []
         child_pylist = self.values.to_pylist()
@@ -218,19 +221,11 @@ class ListArray(Array):
     @classmethod
     def from_pylist(cls, data: List[Optional[Iterable[Any]]]) -> "ListArray":
         """
-        Build a ListArray from a Python list of iterables (or None), with type inference.
-
-        This function infers the element type of the list column and constructs a
-        `ListArrayBuilder` with an appropriate child builder:
-
-        - Primitive elements (bool/int/float): `PrimitiveArrayBuilder(infer_primitive_dtype(...))`
-        - String elements (str): `StringArrayBuilder()`
-        - Nested lists: `ListArrayBuilder(<recursively inferred child builder>)`
-        - Dict elements: `StructArrayBuilder(<inferred struct fields>)`
+        Build a `ListArray` from a Python list of iterables (or `None`), with type inference.
 
         Args:
-            data (List[Optional[Iterable[Any]]]): A list where each item is an iterable (list/tuple)
-                of child elements or None to represent a null list.
+            data (List[Optional[Iterable[Any]]]): A list where each item is an iterable
+                (list/tuple) of child elements or `None` to represent a null list.
                 Elements may be primitives, strings, or nested lists (arbitrary depth).
 
         Returns:
@@ -240,6 +235,16 @@ class ListArray(Array):
             >>> prims = ListArray.from_pylist([[1, 2], None, [3, 4, 5]])
             >>> nested = ListArray.from_pylist([[[1], [2]], None, [[3, 4], []]])
             >>> strings = ListArray.from_pylist([["foo", "bar"], None, ["baz"]])
+
+        Discussion:
+            Q. How does this classmethod work?
+                This function infers the element type of the list column and constructs a
+                `ListArrayBuilder` with an appropriate child builder:
+
+                - Primitive elements (`bool`/`int`/`float`): `PrimitiveArrayBuilder(infer_primitive_dtype(...))`
+                - String elements (`str`): `StringArrayBuilder()`
+                - Nested lists: `ListArrayBuilder(<recursively inferred child builder>)`
+                - Dict elements: `StructArrayBuilder(<inferred struct fields>)`
         """
         child_builder = infer_child_builder(data)
         array_builder = ListArrayBuilder(child_builder)
@@ -251,32 +256,29 @@ class ListArray(Array):
 
 class ListArrayBuilder(ArrayBuilder[Iterable[ChildE], ListArray]):
     """
-    ListArrayBuilder incrementally builds a ListArray
-    for arbitrary element types by composing a child builder.
-
-    The child builder is responsible for appending elements of the list,
-    while this ListArrayBuilder manages list row boundaries (offsets) and nulls (validity bitmap).
+    Incrementally builds a `ListArray` for arbitrary element types
+    by composing a child builder.
 
     Args:
-        child_builder (Builder): builder for the child element type
+        child_builder (Builder): Builder for the child element type.
 
     Discussion:
-        Q. How is this similar to StringArrayBuilder?
+        Q. How does this relate to `StringArrayBuilder`?
             They share the same architectural pattern:
-              1) Maintain cumulative offsets of length n+1 starting at 0.
-              2) Track per-row validity and pack it into a 1-bit bitmap via _pack_bitmap.
-              3) Freeze internal buffers on finish() to produce an immutable Array.
+              1) Maintain cumulative offsets of length `n+1` starting at `0`.
+              2) Track per-row validity and pack it into a 1-bit bitmap via `_pack_bitmap`.
+              3) Freeze internal buffers on `finish()` to produce an immutable `Array`.
 
             In short:
-                - StringArrayBuilder
-                    offsets: int32[n+1] over UTF-8 byte length
-                    values : uint8 flat byte buffer of all strings
-                    finish : returns StringArray(offsets, values, validity)
+                - `StringArrayBuilder`
+                    offsets: `int32[n+1]` over UTF-8 byte length
+                    values : `uint8` flat byte buffer of all strings
+                    finish : returns `StringArray(offsets, values, validity)`
 
-                - ListArrayBuilder
-                    offsets: int32[n+1] over element counts per list row
-                    values : produced by value_builder.finish() — an arbitrary child Array
-                    finish : returns ListArray(offsets, child, validity)
+                - `ListArrayBuilder`
+                    offsets: `int32[n+1]` over element counts per list row
+                    values : produced by `value_builder.finish()` — an arbitrary child `Array`
+                    finish : returns `ListArray(offsets, child, validity)`
     """
 
     def __init__(self, child_builder: ArrayBuilder):
@@ -286,13 +288,13 @@ class ListArrayBuilder(ArrayBuilder[Iterable[ChildE], ListArray]):
 
     def append(self, seq: Optional[Iterable[Any]]) -> "ListArrayBuilder":
         """
-        Append a single list (or None) to the builder.
+        Append a single list (or `None`) to the builder.
 
         Args:
-            seq (Optional[Iterable[Any]]): list to append, or None for null
+            seq (Optional[Iterable[Any]]): List to append, or `None` for null.
 
         Returns:
-            ListArrayBuilder: self for method chaining
+            ListArrayBuilder: `self` for method chaining.
         """
         if seq is None:
             self.validity.append(0)
@@ -308,10 +310,10 @@ class ListArrayBuilder(ArrayBuilder[Iterable[ChildE], ListArray]):
 
     def finish(self) -> ListArray:
         """
-        Finalize the builder and return the built ListArray.
+        Finalize the builder and return the built `ListArray`.
 
         Returns:
-            ListArray: built ListArray
+            ListArray: Built `ListArray`.
         """
         num_offsets = len(self.offsets)
         raw_offsets = bytearray(num_offsets * 4)
