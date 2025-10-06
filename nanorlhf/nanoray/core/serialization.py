@@ -124,20 +124,3 @@ def loads(buf: bytes) -> Any:
         return cloudpickle.loads(raw)
 
     raise ValueError(f"Unknown serialization alg header: {alg!r}")
-
-
-def split_chunks(b: bytes, chunk_size: int) -> list[bytes]:
-    """
-    Split bytes into fixed-size chunks.
-
-    Args:
-        b (bytes): Full payload.
-        chunk_size (int): Chunk size in bytes.
-
-    Returns:
-        List[bytes]: Consecutive slices covering the payload.
-
-    Notes:
-    """
-    n = max(1, int(chunk_size))
-    return [b[i: i + n] for i in range(0, len(b), n)]
