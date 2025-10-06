@@ -10,44 +10,41 @@ from nanorlhf.nanosets.dtype.string_array import StringArrayBuilder
 
 def get_struct_array_builder_from_rows(rows: List[Optional[Dict[str, Any]]]) -> "StructArrayBuilder":
     """
-    Infer and construct a StructBuilder for a nested struct field from dict-like rows.
+    Infer and construct a `StructArrayBuilder` for a nested struct field from dict-like rows.
 
-    This helper inspects a column of nested struct rows (List[Optional[Dict[str, Any]]])
-    to derive a fixed schema (ordered field names) and a corresponding set of child builders.
-
-    Field order preserves first-seen order across non-null rows.
-    For each field, it gathers a column-aligned list of values and delegates
-    builder inference to `inference_builder_for_column(...)`. Finally, it returns a `StructBuilder`
-    that can stream rows via `append(...)` and finalize to a `StructArray` with `finish()`.
-
-    Algorithm:
-        1) Scan all non-null rows to collect field names in first-appearance order.
-        2) Build per-field, column-aligned value lists (length = number of rows).
-            Missing keys are represented as None.
-        3) For each field, call `inference_builder_for_column(values)` to obtain a child builder.
-        4) Return `StructBuilder(field_names, child_builders, strict_keys=True)`.
-
-    If all rows are None (no keys observed), a schema cannot be inferred. Implementations
-    may choose to return an "empty" StructBuilder (no fields) or raise a ValueError
-    depending on the desired behavior. (In the educational version, returning an empty
-    StructBuilder is acceptable.)
-
-    Args:
+    Parameters:
         rows (List[Optional[Dict[str, Any]]]): Column values for a nested struct field,
-            where each entry is a dict (row) or None.
+            where each entry is a `dict` (row) or `None`.
 
     Returns:
         StructArrayBuilder: A builder configured with inferred field names and child builders.
-        Use `append(row)` for each input row and `finish()` to obtain a StructArray.
+        Use `append(row)` for each input row and `finish()` to obtain a `StructArray`.
 
     Examples:
-      >>> rows = [{"id": 1, "name": "a"}, None, {"id": 2}]
-      >>> sb = get_struct_array_builder_from_rows(rows)
-      >>> for r in rows:
-      ...     sb.append(r)
-      >>> arr = sb.finish()
-      >>> arr.to_pylist()
-      [{'id': 1, 'name': 'a'}, None, {'id': 2, 'name': None}]
+        >>> rows = [{"id": 1, "name": "a"}, None, {"id": 2}]
+        >>> sb = get_struct_array_builder_from_rows(rows)
+        >>> for r in rows:
+        ...     sb.append(r)
+        >>> arr = sb.finish()
+        >>> arr.to_pylist()
+        [{'id': 1, 'name': 'a'}, None, {'id': 2, 'name': None}]
+
+    Discussion:
+        Q. How does this function work?
+            This helper inspects a column of nested struct rows (`List[Optional[Dict[str, Any]]]`)
+            to derive a fixed schema (ordered field names) and a corresponding set of child builders.
+
+            Algorithm:
+                1) Scan all non-null rows to collect field names in first-appearance order.
+                2) Build per-field, column-aligned value lists (length = number of rows).
+                   Missing keys are represented as `None`.
+                3) For each field, call `inference_builder_for_column(values)` to obtain a child builder.
+                4) Return `StructBuilder(field_names, child_builders, strict_keys=True)`.
+
+            If all rows are `None` (no keys observed), a schema cannot be inferred.
+            Implementations may choose to return an "empty" `StructBuilder` (no fields)
+            or raise a `ValueError` depending on the desired behavior.
+            (In the educational version, returning an empty `StructBuilder` is acceptable.)
     """
     inner_names: List[str] = []
     seen = set()
@@ -83,42 +80,44 @@ def get_struct_array_builder_from_rows(rows: List[Optional[Dict[str, Any]]]) -> 
 
 def inference_builder_for_column(values: List[Optional[Any]]):
     """
-    Return a Builder for a single struct field (column) by inspecting its values.
+    Return a builder for a single struct field (column) by inspecting its values.
 
-    This helper performs one-pass type inference over a field’s column (length N),
-    where each entry corresponds to one parent row. The first non-None sample selects
-    a candidate category; all other non-None entries must belong to the same category,
-    otherwise a TypeError is raised.
-
-    Inference rules:
-        -  dict:
-            → nested StructBuilder inferred via `get_struct_array_builder_from_rows(values)`
-        - list/tuple:
-            → ListBuilder with child inferred by `infer_child_builder(values)`
-        - str:
-            → StringBuilder
-        - bool/int/float:
-            → PrimitiveBuilder(infer_primitive_dtype(values))
-        - all None:
-            → StringBuilder
-
-    No arrays are materialized here; the function returns a builder instance ready
-    to receive values via `append(...)` and later finalize with `finish()`.
-
-    Args:
-      values (List[Optional[Any]]): Column-aligned values for a single field. Use
-        None for missing entries at any row.
+    Parameters:
+        values (List[Optional[Any]]): Column-aligned values for a single field.
+            Use `None` for missing entries at any row.
 
     Returns:
-      Builder: An initialized builder for this field’s data type.
+        Builder: An initialized builder for this field’s data type.
 
     Examples:
-      >>> inference_builder_for_column([1, None, 2])
-      PrimitiveBuilder(INT64)
-      >>> inference_builder_for_column([["a"], [], None])
-      ListBuilder(StringBuilder())
-      >>> inference_builder_for_column([None, None])
-      StringBuilder()
+        >>> inference_builder_for_column([1, None, 2])
+        PrimitiveBuilder(INT64)
+        >>> inference_builder_for_column([["a"], [], None])
+        ListBuilder(StringBuilder())
+        >>> inference_builder_for_column([None, None])
+        StringBuilder()
+
+    Discussion:
+        Q. How does this function work?
+            This helper performs one-pass type inference over a field’s column (length `N`),
+            where each entry corresponds to one parent row. The first non-`None` sample selects
+            a candidate category; all other non-`None` entries must belong to the same category,
+            otherwise a `TypeError` is raised.
+
+            Inference rules:
+                - `dict`:
+                    → nested `StructBuilder` inferred via `get_struct_array_builder_from_rows(values)`
+                - `list`/`tuple`:
+                    → `ListBuilder` with child inferred by `infer_child_builder(values)`
+                - `str`:
+                    → `StringBuilder`
+                - `bool`/`int`/`float`:
+                    → `PrimitiveBuilder(infer_primitive_dtype(values))`
+                - all `None`:
+                    → `StringBuilder`
+
+            No arrays are materialized here; the function returns a builder instance ready
+            to receive values via `append(...)` and later finalize with `finish()`.
     """
 
     # Pick first non-None sample
@@ -227,17 +226,19 @@ class StructArray(Array):
     @classmethod
     def from_pylist(cls, data: List[Optional[Dict[str, Any]]], *, strict_keys: bool = False) -> "StructArray":
         """
-        Build a StructArray from dict-like rows (or None) with schema + builder inference.
+        Build a `StructArray` from dict-like rows (or `None`) with schema + builder inference.
 
-        Inference rules per field (column):
-          - dict            → StructBuilder (recursive)
-          - list/tuple      → ListBuilder(infer_child_builder(...))
-          - str             → StringBuilder
-          - bool/int/float  → PrimitiveBuilder(infer_primitive_dtype(...))
-          - all None        → StringBuilder (education-friendly default)
+        Discussion:
+            Q. How does this method work?
+                Inference rules per field (column):
+                  - `dict`            → `StructBuilder` (recursive)
+                  - `list`/`tuple`    → `ListBuilder(infer_child_builder(...))`
+                  - `str`             → `StringBuilder`
+                  - `bool`/`int`/`float`  → `PrimitiveBuilder(infer_primitive_dtype(...))`
+                  - all `None`        → `StringBuilder` (education-friendly default)
 
-        Missing keys in a row are treated as None. Parent None marks the entire row null.
-        Field order preserves first appearance order across non-null rows.
+                Missing keys in a row are treated as `None`. Parent `None` marks the entire row null.
+                Field order preserves first appearance order across non-null rows.
         """
         num_rows = len(data)
 
@@ -334,11 +335,16 @@ class StructArrayBuilder(ArrayBuilder[Optional[Dict[str, Any]], StructArray]):
 
     def append(self, row: Optional[Dict[str, Any]]) -> "StructArrayBuilder":
         """
-        Append one struct row (dict) or None (null row).
+        Append one struct row (`dict`) or `None` (null row).
 
-        - If row is None: parent validity = 0; every child gets None.
-        - If row is dict: parent validity = 1; distribute values to each child by name.
-                          Missing key → None; Unexpected key → error (if strict_keys=True).
+        Parameters:
+            row (Optional[Dict[str, Any]]): Input row or `None`.
+
+        Discussion:
+            Q. How does this method behave for different inputs?
+                - If `row` is `None`: parent validity = `0`; every child gets `None`.
+                - If `row` is `dict`: parent validity = `1`; distribute values to each child by name.
+                  Missing key → `None`; Unexpected key → error (if `strict_keys=True`).
         """
         if row is None:
             self.validity.append(0)
@@ -366,7 +372,12 @@ class StructArrayBuilder(ArrayBuilder[Optional[Dict[str, Any]], StructArray]):
         return self
 
     def finish(self) -> StructArray:
-        """Finalize and return a StructArray."""
+        """
+        Finalize and return a `StructArray`.
+
+        Returns:
+            StructArray: The finished array with aligned children and validity bitmap.
+        """
         # Finalize each child builder
         children_arrays: List[Array] = []
         for builder in self.child_builders:
