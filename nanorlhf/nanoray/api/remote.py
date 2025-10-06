@@ -49,25 +49,18 @@ class RemoteFunction:
         Q. What if I want a `TaskSpec` without submitting?
             Use `.spec(*args, **kwargs)` to build a `TaskSpec`. This works even
             without a global session and can be submitted manually later.
-
-        Q. How does this differ from Ray?
-            Ray’s `.remote` typically returns an `ObjectRef` immediately
-            (submission is asynchronous). We model a minimal, transparent flow
-            for lecture purposes and keep the API surface small.
     """
 
     fn: Callable[..., Any]
     num_cpus: float = 1.0
     num_gpus: float = 0.0
-    resources: Dict[str, float] = None  # type: ignore[assignment]
+    resources: Dict[str, float] = None
     priority: int = 0
     runtime_env: Optional[RuntimeEnv] = None
 
     def __post_init__(self) -> None:
         if self.resources is None:
             object.__setattr__(self, "resources", {})
-
-    # -------- user-facing API --------
 
     def options(
         self,
