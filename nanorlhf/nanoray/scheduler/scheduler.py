@@ -172,7 +172,7 @@ class Scheduler:
         Find nodes that have enough available capacity for the given task.
 
         Args:
-            task (Task): The task  to check.
+            task (Task): The task to check.
 
         Returns:
             List[str]: Node IDs that can run the task.
