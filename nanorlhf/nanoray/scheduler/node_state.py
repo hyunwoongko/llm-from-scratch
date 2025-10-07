@@ -43,52 +43,52 @@ class NodeState:
                 return False
         return True
 
-    def can_run(self, spec: Task) -> bool:
+    def can_run(self, task: Task) -> bool:
         """
-        Check if the node has enough available resources to run the given task spec.
+        Check if the node has enough available resources to run the given task.
 
         Args:
-            spec (Task): The task specification to check.
+            task (Task): The task specification to check.
 
         Returns:
             bool: True if the node can run the task, False otherwise.
         """
-        if self.used_cpus + spec.num_cpus > self.total_cpus:
+        if self.used_cpus + task.num_cpus > self.total_cpus:
             return False
-        if self.used_gpus + spec.num_gpus > self.total_gpus:
+        if self.used_gpus + task.num_gpus > self.total_gpus:
             return False
-        if spec.resources and not self.fit_custom(spec.resources):
+        if task.resources and not self.fit_custom(task.resources):
             return False
         return True
 
-    def allocate(self, spec: Task):
+    def allocate(self, task: Task):
         """
-        Reserve resources for the given task spec.
+        Reserve resources for the given task.
 
         Args:
-            spec (Task): The task specification whose resources to allocate.
+            task (Task): The task specification whose resources to allocate.
 
         Notes:
-            `release(spec)` must be called afterward to free them.
+            `release(task)` must be called afterward to free them.
         """
 
-        self.used_cpus += spec.num_cpus
-        self.used_gpus += spec.num_gpus
-        if spec.resources:
-            for k, v in spec.resources.items():
+        self.used_cpus += task.num_cpus
+        self.used_gpus += task.num_gpus
+        if task.resources:
+            for k, v in task.resources.items():
                 self.used_custom[k] = self.used_custom.get(k, 0.0) + float(v)
 
-    def release(self, spec: Task):
+    def release(self, task: Task):
         """
-        Free resources previously reserved for the given task spec.
+        Free resources previously reserved for the given task.
 
         Args:
-            spec (Task): The task specification whose resources to release.
+            task (Task): The task specification whose resources to release.
         """
-        self.used_cpus -= spec.num_cpus
-        self.used_gpus -= spec.num_gpus
-        if spec.resources:
-            for k, v in spec.resources.items():
+        self.used_cpus -= task.num_cpus
+        self.used_gpus -= task.num_gpus
+        if task.resources:
+            for k, v in task.resources.items():
                 self.used_custom[k] = self.used_custom.get(k, 0.0) - float(v)
                 if self.used_custom[k] <= 0.0:
                     self.used_custom.pop(k)

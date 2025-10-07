@@ -86,7 +86,7 @@ class Task(Generic[T]):
             priority (int): Scheduling hint (teaching-only), default `0`.
 
         Returns:
-            Task[T]: A new immutable task taskification.
+            Task[T]: A new immutable task specification.
 
         Examples:
             >>> def mul(a, b): return a * b
