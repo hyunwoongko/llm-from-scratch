@@ -2,7 +2,7 @@ from typing import Dict, Tuple, Any, Optional, List
 
 from nanorlhf.nanoray.core.object_ref import ObjectRef
 from nanorlhf.nanoray.core.object_store import ObjectStore
-from nanorlhf.nanoray.core.task_spec import TaskSpec
+from nanorlhf.nanoray.core.task import Task
 from nanorlhf.nanoray.network.router import Router
 from nanorlhf.nanoray.network.rpc_client import RpcClient
 from nanorlhf.nanoray.scheduler.policies import SchedulingPolicy
@@ -121,7 +121,7 @@ class Session:
 
     # ---------- driver surface ----------
 
-    def submit(self, spec: TaskSpec) -> Optional[ObjectRef]:
+    def submit(self, task: Task) -> Optional[ObjectRef]:
         """
         Submit a task to the scheduler (enqueue-only).
 
@@ -129,19 +129,19 @@ class Session:
         `None`. Call `drain()` to advance the queue and collect produced refs.
 
         Args:
-            spec (TaskSpec): Declarative description of a remote function call.
+            task (Task): Declarative description of a remote function call.
 
         Returns:
             Optional[ObjectRef]: Always `None` in the enqueue-only model.
 
         Examples:
-            >>> # build specs, submit all, then drain()
+            >>> # build tasks, submit all, then drain()
             >>> refs = []
             >>> for i in range(3):
-            ...     _ = sess.submit(TaskSpec.from_call(lambda x: x + 1, args=(i,)))
+            ...     _ = sess.submit(Task.from_call(lambda x: x + 1, args=(i,)))
             >>> refs += sess.drain()
         """
-        return self.scheduler.submit(spec)
+        return self.scheduler.submit(task)
 
     def drain(self) -> List[ObjectRef]:
         """
@@ -340,25 +340,25 @@ def put(value: Any, *, node_id: Optional[str] = None) -> ObjectRef:
     return sess.put(value, node_id=node_id)
 
 
-def submit(spec: TaskSpec) -> Optional[ObjectRef]:
+def submit(task: Task) -> Optional[ObjectRef]:
     """
     Convenience function: submit a task via the global session (enqueue-only).
 
     Args:
-        spec (TaskSpec): Declarative description of a remote function call.
+        task (Task): Declarative description of a remote function call.
 
     Returns:
         Optional[ObjectRef]: Always `None` in the enqueue-only model.
 
     Examples:
         >>> def add(x, y): return x + y
-        >>> _ = submit(TaskSpec.from_call(add, args=(3, 4)))
+        >>> _ = submit(Task.from_call(add, args=(3, 4)))
         >>> refs = drain()
         >>> get(refs[-1])
         7
     """
     sess = get_session()
-    return sess.submit(spec)
+    return sess.submit(task)
 
 
 def drain() -> List[ObjectRef]:

@@ -2,7 +2,7 @@ import heapq
 from typing import Dict, List, Tuple, Optional, Protocol
 
 from nanorlhf.nanoray.core.object_ref import ObjectRef
-from nanorlhf.nanoray.core.task_spec import TaskSpec
+from nanorlhf.nanoray.core.task import Task
 from nanorlhf.nanoray.scheduler.node_state import NodeState
 from nanorlhf.nanoray.scheduler.policies import SchedulingPolicy
 
@@ -17,7 +17,7 @@ class WorkerLike(Protocol):
             Both `Worker` and `RemoteWorkerProxy` can satisfy this protocol.
     """
 
-    def execute_task(self, spec: TaskSpec) -> ObjectRef: ...
+    def execute_task(self, task: Task) -> ObjectRef: ...
 
 
 class Scheduler:
@@ -33,7 +33,7 @@ class Scheduler:
     Examples:
         >>> from nanorlhf.nanoray.scheduler.policies import RoundRobin
         >>> from nanorlhf.nanoray.core.object_store import ObjectStore
-        >>> from nanorlhf.nanoray.core.task_spec import TaskSpec
+        >>> from nanorlhf.nanoray.core.task import Task
         >>> from nanorlhf.nanoray.runtime.worker import Worker
         >>> def add(x, y): return x + y
         >>> nodes = {
@@ -41,14 +41,14 @@ class Scheduler:
         ...   "B": (Worker(store=ObjectStore("B")), {"cpus": 2.0, "gpus": 0.0, "resources": {}}),
         ... }
         >>> sched = Scheduler(policy=RoundRobin(), nodes=nodes)
-        >>> specs = [TaskSpec.from_call(add, (i, i)) for i in range(4)]
-        >>> refs = [sched.submit(s) for s in specs] + sched.drain()
+        >>> tasks = [Task.from_call(add, (i, i)) for i in range(4)]
+        >>> refs = [sched.submit(s) for s in tasks] + sched.drain()
         >>> all(r is not None for r in refs)
         True
 
     Discussion:
         Q. What does the scheduler do end-to-end?
-            (1) Accepts `TaskSpec`s
+            (1) Accepts `Task`s
             (2) Chooses a node using a `SchedulingPolicy`
             (3) Executes on that node's `Worker`
             (4) Returns the produced `ObjectRef`
@@ -90,23 +90,23 @@ class Scheduler:
         self._order = order
         self.policy.set_node_order(order)
 
-        # priority queue of pending tasks: (-priority, seq, task_spec)
-        self._q: List[Tuple[int, int, TaskSpec]] = []
+        # priority queue of pending tasks: (-priority, seq, task)
+        self._q: List[Tuple[int, int, Task]] = []
         self._seq = 0
 
-    def submit(self, spec: TaskSpec) -> Optional[ObjectRef]:
+    def submit(self, task: Task) -> Optional[ObjectRef]:
         """
         Try to place and execute the task immediately.
         Otherwise, enqueue it for later placement.
 
         Args:
-            spec (TaskSpec): Declarative description of a remote function call.
+            task (Task): Declarative description of a remote function call.
 
         Returns:
             Optional[ObjectRef]: Result reference if placed now, else `None`.
         """
-        neg_pri = -int(spec.priority or 0)
-        heapq.heappush(self._q, (neg_pri, self._seq, spec))
+        neg_pri = -int(task.priority or 0)
+        heapq.heappush(self._q, (neg_pri, self._seq, task))
         self._seq += 1
         return None
 
@@ -132,7 +132,7 @@ class Scheduler:
 
                 3) After inspecting the whole heap once, push every item in `pending`
                    back into the heap unchanged. This preserves both *priority* and
-                   *FIFO order* because we reinsert the same `(priority, seq, spec)` tuples.
+                   *FIFO order* because we reinsert the same `(priority, seq, task)` tuples.
 
                 4) If at least one task ran (`progressed=True`), we do another round,
                    because completed tasks may have freed resources and unlocked others.
@@ -154,12 +154,12 @@ class Scheduler:
 
         while self._q and progressed:
             progressed = False
-            pending: List[Tuple[int, int, TaskSpec]] = []
+            pending: List[Tuple[int, int, Task]] = []
             while self._q:
-                priority, seq, spec = heapq.heappop(self._q)
-                ref = self._try_place(spec)
+                priority, seq, task = heapq.heappop(self._q)
+                ref = self._try_place(task)
                 if ref is None:
-                    pending.append((priority, seq, spec))
+                    pending.append((priority, seq, task))
                 else:
                     produced.append(ref)
                     progressed = True
@@ -167,32 +167,32 @@ class Scheduler:
                 heapq.heappush(self._q, item)
         return produced
 
-    def _eligible_nodes(self, spec: TaskSpec) -> List[str]:
+    def _eligible_nodes(self, task: Task) -> List[str]:
         """
-        Find nodes that have enough available capacity for the given task spec.
+        Find nodes that have enough available capacity for the given task.
 
         Args:
-            spec (TaskSpec): The task specification to check.
+            task (Task): The task  to check.
 
         Returns:
             List[str]: Node IDs that can run the task.
         """
         return [
             nid for nid, state in self._state.items()
-            if state.can_run(spec)
+            if state.can_run(task)
         ]
 
-    def _try_place(self, spec: TaskSpec) -> Optional[ObjectRef]:
+    def _try_place(self, task: Task) -> Optional[ObjectRef]:
         """
         Attempt to place the task on an eligible node using the scheduling policy.
 
         Args:
-            spec (TaskSpec): The task specification to place.
+            task (Task): The task to place.
 
         Returns:
             Optional[ObjectRef]: Result reference if placed, else `None`.
         """
-        cands = self._eligible_nodes(spec)
+        cands = self._eligible_nodes(task)
         if not cands:
             return None
 
@@ -201,11 +201,11 @@ class Scheduler:
             return None
 
         st = self._state[nid]
-        st.allocate(spec)
+        st.allocate(task)
 
         try:
             worker = self._workers[nid]
-            ref = worker.execute_task(spec)
+            ref = worker.execute_task(task)
             return ref
         finally:
-            st.release(spec)
+            st.release(task)

@@ -12,8 +12,6 @@ Discussion:
        timing assumptions to stay stable across machines.
 """
 
-from __future__ import annotations
-
 import os
 import tempfile
 from typing import Any, Tuple
@@ -24,7 +22,7 @@ from nanorlhf.nanoray.api.session import Session
 from nanorlhf.nanoray.core import serialization as ser
 from nanorlhf.nanoray.core.object_store import ObjectStore
 from nanorlhf.nanoray.core.runtime_env import RuntimeEnv
-from nanorlhf.nanoray.core.task_spec import TaskSpec
+from nanorlhf.nanoray.core.task import Task
 from nanorlhf.nanoray.runtime.worker import Worker
 from nanorlhf.nanoray.scheduler.policies import FIFO, RoundRobin
 
@@ -72,16 +70,16 @@ def test_scheduler_priority_and_fifo_rounds() -> None:
     sess = Session(policy=FIFO(), nodes=nodes, default_node_id="A")
 
     f = _make_priority_task("P")
-    # build specs with explicit priorities
-    specs = [
-        TaskSpec.from_call(f, args=(1,), priority=0),
-        TaskSpec.from_call(f, args=(2,), priority=10),
-        TaskSpec.from_call(f, args=(3,), priority=5),
-        TaskSpec.from_call(f, args=(4,), priority=10),
-        TaskSpec.from_call(f, args=(5,), priority=5),
+    # build tasks with explicit priorities
+    tasks = [
+        Task.from_call(f, args=(1,), priority=0),
+        Task.from_call(f, args=(2,), priority=10),
+        Task.from_call(f, args=(3,), priority=5),
+        Task.from_call(f, args=(4,), priority=10),
+        Task.from_call(f, args=(5,), priority=5),
     ]
     # submit in arbitrary order
-    refs = [sess.submit(s) for s in specs]
+    refs = [sess.submit(s) for s in tasks]
     # anything placed immediately comes back as ObjectRef; rest are queued
     refs = [r for r in refs if r is not None]
     # drain the queue (produces in scheduling order)
@@ -128,9 +126,9 @@ def test_remote_many_mmul_roundrobin() -> None:
     payloads = [(rng.standard_normal((128, 128), dtype="float32"),
                  rng.standard_normal((128, 128), dtype="float32")) for _ in range(16)]
 
-    # submit via remote decorator (global session not required since we call .spec())
-    specs = [mmul.options(priority=10 if i < 4 else 0).spec(A, B) for i, (A, B) in enumerate(payloads)]
-    refs = [sess.submit(s) for s in specs]
+    # submit via remote decorator (global session not required since we call .task())
+    tasks = [mmul.options(priority=10 if i < 4 else 0).task(A, B) for i, (A, B) in enumerate(payloads)]
+    refs = [sess.submit(s) for s in tasks]
     refs = [r for r in refs if r is not None] + sess.drain()
 
     # verify numerically against numpy ground truth
@@ -160,8 +158,8 @@ def test_runtime_env_scoped_changes_tmpdir(tmp_path: tempfile.TemporaryDirectory
     sess = Session(policy=FIFO(), nodes=nodes, default_node_id="A")
 
     env = RuntimeEnv(env_vars={"FOO": "BAR"}, cwd=str(tmp_path))
-    spec = TaskSpec.from_call(_echo_env_and_cwd, args=("FOO",), runtime_env=env)
-    r = sess.submit(spec) or sess.drain()[-1]
+    task = Task.from_call(_echo_env_and_cwd, args=("FOO",), runtime_env=env)
+    r = sess.submit(task) or sess.drain()[-1]
     cwd, foo = sess.get(r)
     assert cwd == str(tmp_path)
     assert foo == "BAR"
@@ -246,7 +244,7 @@ def test_global_wrappers_smoke() -> None:
 
     def add(a, b): return a + b
 
-    r2 = gsubmit(TaskSpec.from_call(add, args=(2, 5)))
+    r2 = gsubmit(Task.from_call(add, args=(2, 5)))
     refs = [r2] if r2 is not None else []
     refs += gdrain()
     assert gget(refs[-1]) == 7

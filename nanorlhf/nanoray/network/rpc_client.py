@@ -5,7 +5,7 @@ from urllib import request
 
 from nanorlhf.nanoray.core.object_ref import ObjectRef
 from nanorlhf.nanoray.core.serialization import dumps
-from nanorlhf.nanoray.core.task_spec import TaskSpec
+from nanorlhf.nanoray.core.task import Task
 from nanorlhf.nanoray.network.router import NodeRegistry
 
 
@@ -86,23 +86,23 @@ class RpcClient:
             raise RuntimeError(f"Remote get_object failed: {err_msg}")
         return base64.b64decode(res["payload_b64"])
 
-    def execute_task(self, node_id: str, task_spec: TaskSpec) -> ObjectRef:
+    def execute_task(self, node_id: str, task: Task) -> ObjectRef:
         """
         Send a task execution request to a remote node.
 
         Args:
             node_id (str): target node ID
-            task_spec (Dict[str, Any]): Task specification dictionary
+            task (Dict[str, Any]): Task dictionary
 
         Returns:
             Dict[str, Any]: Task execution result
         """
-        blob = dumps(task_spec)
+        blob = dumps(task)
 
         res = self._request(
             node_id=node_id,
             path="/rpc/execute_task",
-            body={"spec_b64": base64.b64encode(blob).decode("ascii")},
+            body={"task_b64": base64.b64encode(blob).decode("ascii")},
         )
 
         if not res.get("ok"):

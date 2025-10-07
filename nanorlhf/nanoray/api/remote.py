@@ -3,11 +3,11 @@ from typing import Any, Callable, Dict, Optional, Protocol
 
 from nanorlhf.nanoray.core.object_ref import ObjectRef
 from nanorlhf.nanoray.core.runtime_env import RuntimeEnv
-from nanorlhf.nanoray.core.task_spec import TaskSpec
+from nanorlhf.nanoray.core.task import Task
 
 
 class _Submittable(Protocol):
-    def __call__(self, spec: TaskSpec) -> Optional[ObjectRef]: ...
+    def __call__(self, task: Task) -> Optional[ObjectRef]: ...
 
 
 @dataclass(frozen=True)
@@ -44,8 +44,8 @@ class RemoteFunction:
             We keep this visible by returning `Optional[ObjectRef]` and using
             `drain()` to advance queued work. This makes scheduling state explicit.
 
-        Q. What if I want a `TaskSpec` without submitting?
-            Use `.spec(*args, **kwargs)` to build a `TaskSpec`. This works even
+        Q. What if I want a `Task` without submitting?
+            Use `.task(*args, **kwargs)` to build a `Task`. This works even
             without a global session and can be submitted manually later.
     """
 
@@ -88,20 +88,20 @@ class RemoteFunction:
             runtime_env=self.runtime_env if runtime_env is None else runtime_env,
         )
 
-    def spec(self, *args: Any, **kwargs: Any) -> TaskSpec:
+    def task(self, *args: Any, **kwargs: Any) -> Task:
         """
-        Build a `TaskSpec` for this function call without submitting it.
+        Build a `Task` for this function call without submitting it.
 
         Returns:
-            TaskSpec: Declarative description of the remote call.
+            Task: Declarative description of the remote call.
 
         Examples:
             >>> @remote()
             ... def add(x, y): return x + y
             ...
-            >>> spec = add.spec(3, 4)  # create TaskSpec
+            >>> task = add.task(3, 4)  # create Task
         """
-        return TaskSpec.from_call(
+        return Task.from_call(
             self.fn,
             args=tuple(args),
             kwargs=dict(kwargs),
@@ -135,8 +135,8 @@ class RemoteFunction:
         except Exception as exc:  # pragma: no cover
             raise RuntimeError("Global session is not available; call init() first.") from exc
 
-        spec = self.spec(*args, **kwargs)
-        return submit(spec)  # Optional[ObjectRef]
+        task = self.task(*args, **kwargs)
+        return submit(task)  # Optional[ObjectRef]
 
 
 def remote(_fn: Optional[Callable[..., Any]] = None, **opts: Any) -> Callable[..., RemoteFunction] | RemoteFunction:
@@ -164,8 +164,8 @@ def remote(_fn: Optional[Callable[..., Any]] = None, **opts: Any) -> Callable[..
         ...
         >>> # submit immediately (requires init())
         >>> r = mul.remote(6, 7)
-        >>> # or build a spec without submitting:
-        >>> spec = mul.spec(6, 7)
+        >>> # or build a task without submitting:
+        >>> task = mul.task(6, 7)
     """
     def _wrap(fn: Callable[..., Any]) -> RemoteFunction:
         return RemoteFunction(fn=fn, **opts)

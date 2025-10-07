@@ -3,7 +3,7 @@ from typing import Optional
 
 from nanorlhf.nanoray.core.object_ref import ObjectRef
 from nanorlhf.nanoray.core.object_store import ObjectStore
-from nanorlhf.nanoray.core.task_spec import TaskSpec
+from nanorlhf.nanoray.core.task import Task
 from nanorlhf.nanoray.runtime.process_pool import ProcessPool
 
 
@@ -20,7 +20,7 @@ def _invoke(fn, args, kwargs):
 
 class Worker:
     """
-    `Worker` executes a `TaskSpec`, stores the result into an `ObjectStore`,
+    `Worker` executes a `Task`, stores the result into an `ObjectStore`,
     and returns an `ObjectRef` to the caller.
 
     The worker can run tasks in the current process (default) or submit them to
@@ -32,13 +32,13 @@ class Worker:
 
     Examples:
         >>> # Local (in-process) execution
-        >>> from nanorlhf.nanoray.core.task_spec import TaskSpec
+        >>> from nanorlhf.nanoray.core.task import Task
         >>> from nanorlhf.nanoray.core.object_store import ObjectStore
         >>> def add(x, y): return x + y
         >>> store = ObjectStore("node-A")
         >>> w = Worker(store=store)
-        >>> spec = TaskSpec.from_call(add, (3, 4))
-        >>> ref = w.execute_task(spec)
+        >>> task = Task.from_call(add, (3, 4))
+        >>> ref = w.execute_task(task)
         >>> store.get(ref)
         7
 
@@ -46,7 +46,7 @@ class Worker:
         >>> from nanorlhf.nanoray.runtime.process_pool import ProcessPool
         >>> pool = ProcessPool(max_workers=2)
         >>> w2 = Worker(store=store, pool=pool)
-        >>> ref2 = w2.execute_task(spec)  # executed in a separate process
+        >>> ref2 = w2.execute_task(task)  # executed in a separate process
         >>> store.get(ref2)
         7
         >>> pool.shutdown()
@@ -56,15 +56,15 @@ class Worker:
         self.store = store
         self.pool = pool
 
-    def execute_task(self, spec: TaskSpec) -> ObjectRef:
+    def execute_task(self, task: Task) -> ObjectRef:
         """
-        Execute the given `TaskSpec` and return an `ObjectRef` to the result.
+        Execute the given `Task` and return an `ObjectRef` to the result.
 
         Args:
-            spec (TaskSpec): Declarative description of a remote function call.
+            task (Task): Declarative description of a remote function call.
 
         Returns:
-            ObjectRef: Handle to the value produced by `spec.fn(*spec.args, **spec.kwargs)`.
+            ObjectRef: Handle to the value produced by `task.fn(*task.args, **task.kwargs)`.
 
         Notes:
             - Ownership: the produced object is stored on this worker's store, so the
@@ -73,18 +73,18 @@ class Worker:
         node_id = self.store.node_id
 
         try:
-            with spec.runtime_env.apply() if spec.runtime_env is not None else nullcontext():
+            with task.runtime_env.apply() if task.runtime_env is not None else nullcontext():
                 if self.pool is None:
-                    result = _invoke(spec.fn, spec.args, spec.kwargs)
+                    result = _invoke(task.fn, task.args, task.kwargs)
                 else:
-                    future = self.pool.submit(_invoke, spec.fn, spec.args, spec.kwargs)
+                    future = self.pool.submit(_invoke, task.fn, task.args, task.kwargs)
                     result = future.result()
             ref = self.store.put(result)
             return ref
 
         except Exception as e:
             raise RuntimeError(
-                f"Task {spec.task_id} failed in worker@{node_id}"
+                f"Task {task.task_id} failed in worker@{node_id}"
             ) from e
 
     def rpc_read_object_bytes(self, object_id: str) -> bytes:
@@ -100,17 +100,17 @@ class Worker:
         """
         return self.store.get_bytes(object_id)
 
-    def rpc_execute_task(self, spec: TaskSpec) -> ObjectRef:
+    def rpc_execute_task(self, task: Task) -> ObjectRef:
         """
         Execute a task on behalf of a remote caller.
 
         Args:
-            spec (TaskSpec): The remote execution request.
+            task (Task): The remote execution request.
 
         Returns:
             ObjectRef: Handle to the produced result (owned by this node).
         """
-        ref = self.execute_task(spec)
+        ref = self.execute_task(task)
 
         try:
             payload = self.store.get_bytes(ref.object_id)

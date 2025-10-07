@@ -1,5 +1,5 @@
 from nanorlhf.nanoray.core.object_ref import ObjectRef
-from nanorlhf.nanoray.core.task_spec import TaskSpec
+from nanorlhf.nanoray.core.task import Task
 from nanorlhf.nanoray.network.rpc_client import RpcClient
 
 
@@ -22,5 +22,5 @@ class RemoteWorkerProxy:
         self.node_id = node_id
         self.rpc = rpc
 
-    def execute_task(self, spec: TaskSpec) -> ObjectRef:
-        return self.rpc.execute_task(self.node_id, spec)
+    def execute_task(self, task: Task) -> ObjectRef:
+        return self.rpc.execute_task(self.node_id, task)

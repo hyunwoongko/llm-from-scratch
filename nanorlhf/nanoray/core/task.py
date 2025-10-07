@@ -8,11 +8,11 @@ T = TypeVar("T")
 
 
 @dataclass(frozen=True)
-class TaskSpec(Generic[T]):
+class Task(Generic[T]):
     """
-    `TaskSpec` is an immutable data record that describes a single remote function call.
+    `Task` is an immutable data record that describes a single remote function call.
     Instead of invoking a Python function immediately, the runtime the call as a declarative
-    spec and submits it to the scheduler for placement and execution.
+    task and submits it to the scheduler for placement and execution.
 
     Attributes:
         task_id (str): A globally unique id (e.g., `"task-9ff8c3a2"`).
@@ -28,18 +28,18 @@ class TaskSpec(Generic[T]):
 
     Examples:
         >>> def add(x, y): return x + y
-        >>> spec = TaskSpec(fn=add, args=(1, 2), kwargs={}, num_cpus=0.5)
-        >>> print(spec.fn is add, spec.args, spec.num_cpus)
+        >>> task = Task(fn=add, args=(1, 2), kwargs={}, num_cpus=0.5)
+        >>> print(task.fn is add, task.args, task.num_cpus)
         True (1, 2) 0.5
 
     Discussion:
-        Q. Why keep a `TaskSpec` instead of calling the function right away?
+        Q. Why keep a `Task` instead of calling the function right away?
             In a distributed runtime, *when* and *where* to execute matters.
-            By turning a call into a spec, the scheduler can choose the best node
+            By turning a call into a task, the scheduler can choose the best node
             (considering resources and placement groups) before any execution happens.
 
         Q. Why immutable?
-            Once submitted, the spec is shared across components (driver, scheduler, worker).
+            Once submitted, the task is shared across components (driver, scheduler, worker).
             Making it immutable prevents accidental mutation after scheduling decisions.
     """
 
@@ -70,9 +70,9 @@ class TaskSpec(Generic[T]):
         runtime_env: Optional[RuntimeEnv] = None,
         placement_group: Optional[str] = None,
         priority: int = 0,
-    ) -> "TaskSpec[T]":
+    ) -> "Task[T]":
         """
-        Build a `TaskSpec` from a Python callable and its arguments.
+        Build a `Task` from a Python callable and its arguments.
 
         Args:
             fn (Callable[..., T]): The function to run remotely.
@@ -81,16 +81,16 @@ class TaskSpec(Generic[T]):
             num_cpus (float): CPU requirement (default `1.0`).
             num_gpus (float): GPU requirement (default `0.0`).
             resources (Optional[Dict[str, float]]): Custom resources (e.g., `{"ram_gb": 4}`).
-            runtime_env (Optional[RuntimeEnv]): Optional runtime environment spec.
+            runtime_env (Optional[RuntimeEnv]): Optional runtime environment task.
             placement_group (Optional[str]): Placement group id, if any.
             priority (int): Scheduling hint (teaching-only), default `0`.
 
         Returns:
-            TaskSpec[T]: A new immutable task specification.
+            Task[T]: A new immutable task taskification.
 
         Examples:
             >>> def mul(a, b): return a * b
-            >>> TaskSpec.from_call(mul, (3, 4)).args
+            >>> Task.from_call(mul, (3, 4)).args
             (3, 4)
         """
         return cls(

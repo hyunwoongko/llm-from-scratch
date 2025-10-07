@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Dict
 
-from nanorlhf.nanoray.core.task_spec import TaskSpec
+from nanorlhf.nanoray.core.task import Task
 
 
 @dataclass
@@ -43,12 +43,12 @@ class NodeState:
                 return False
         return True
 
-    def can_run(self, spec: TaskSpec) -> bool:
+    def can_run(self, spec: Task) -> bool:
         """
         Check if the node has enough available resources to run the given task spec.
 
         Args:
-            spec (TaskSpec): The task specification to check.
+            spec (Task): The task specification to check.
 
         Returns:
             bool: True if the node can run the task, False otherwise.
@@ -61,12 +61,12 @@ class NodeState:
             return False
         return True
 
-    def allocate(self, spec: TaskSpec):
+    def allocate(self, spec: Task):
         """
         Reserve resources for the given task spec.
 
         Args:
-            spec (TaskSpec): The task specification whose resources to allocate.
+            spec (Task): The task specification whose resources to allocate.
 
         Notes:
             `release(spec)` must be called afterward to free them.
@@ -78,12 +78,12 @@ class NodeState:
             for k, v in spec.resources.items():
                 self.used_custom[k] = self.used_custom.get(k, 0.0) + float(v)
 
-    def release(self, spec: TaskSpec):
+    def release(self, spec: Task):
         """
         Free resources previously reserved for the given task spec.
 
         Args:
-            spec (TaskSpec): The task specification whose resources to release.
+            spec (Task): The task specification whose resources to release.
         """
         self.used_cpus -= spec.num_cpus
         self.used_gpus -= spec.num_gpus

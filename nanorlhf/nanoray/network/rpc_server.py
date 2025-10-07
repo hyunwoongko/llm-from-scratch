@@ -7,7 +7,7 @@ from socketserver import ThreadingMixIn
 from typing import Any, Dict, Optional
 
 from nanorlhf.nanoray.core.serialization import loads
-from nanorlhf.nanoray.core.task_spec import TaskSpec
+from nanorlhf.nanoray.core.task import Task
 from nanorlhf.nanoray.runtime.worker import Worker
 
 
@@ -59,7 +59,7 @@ class RpcServer:
                 Response: {"ok": true, "payload_b64": "..."}
 
             POST /rpc/execute_task:
-                Request: {"spec_b64": base64-encoded-bytes}
+                Request: {"task_b64": base64-encoded-bytes}
                 Response: {"ok": true, "ref": {"object_id": "...", "owner_node_id": "...", "size_bytes": null}}
 
             When errors occur:
@@ -246,13 +246,13 @@ class RpcServer:
 
                     elif self.path == "/rpc/execute_task":
                         """
-                        Request: {"spec_b64": base64-encoded-bytes}
+                        Request: {"task_b64": base64-encoded-bytes}
                         Response: {"ok": true, "ref": {"object_id": "...", "owner_node_id": "...", "size_bytes": null}}
                         """
                         body = self._json()
-                        blob = base64.b64decode(body.get("spec_b64", ""))
-                        spec: TaskSpec = loads(blob)
-                        ref = self.server.worker.rpc_execute_task(spec)  # noqa
+                        blob = base64.b64decode(body.get("task_b64", ""))
+                        task: Task = loads(blob)
+                        ref = self.server.worker.rpc_execute_task(task)  # noqa
 
                         self._send(
                             HTTPStatus.OK, {
