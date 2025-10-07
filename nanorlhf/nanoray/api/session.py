@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Dict, Tuple, Any, Optional, List
 
 from nanorlhf.nanoray.core.object_ref import ObjectRef
