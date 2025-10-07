@@ -1,12 +1,14 @@
-from typing import Dict, Tuple, Any, Optional, List
+from typing import Dict, Tuple, Any, Optional, List, Union
 
 from nanorlhf.nanoray.core.object_ref import ObjectRef
 from nanorlhf.nanoray.core.object_store import ObjectStore
+from nanorlhf.nanoray.core.placement import Bundle, PlacementStrategy, PlacementGroup
 from nanorlhf.nanoray.core.task import Task
 from nanorlhf.nanoray.network.router import Router
 from nanorlhf.nanoray.network.rpc_client import RpcClient
 from nanorlhf.nanoray.scheduler.policies import SchedulingPolicy
 from nanorlhf.nanoray.scheduler.scheduler import Scheduler, WorkerLike
+from nanorlhf.nanoray.utils import new_placement_group_id
 
 
 class Session:
@@ -121,7 +123,7 @@ class Session:
 
     # ---------- driver surface ----------
 
-    def submit(self, task: Task) -> Optional[ObjectRef]:
+    def submit(self, task: Task, blocking=False) -> Optional[ObjectRef]:
         """
         Submit a task to the scheduler (enqueue-only).
 
@@ -130,6 +132,7 @@ class Session:
 
         Args:
             task (Task): Declarative description of a remote function call.
+            blocking (bool): If True, use `submit_blocking()` to ensure an `ObjectRef` is returned.
 
         Returns:
             Optional[ObjectRef]: Always `None` in the enqueue-only model.
@@ -141,7 +144,37 @@ class Session:
             ...     _ = sess.submit(Task.from_call(lambda x: x + 1, args=(i,)))
             >>> refs += sess.drain()
         """
+        if blocking:
+            return self.submit_blocking(task)
         return self.scheduler.submit(task)
+
+    def submit_blocking(self, task: Task) -> ObjectRef:
+        """
+        Submit a task and ensure an ObjectRef is returned (never None).
+
+        This drives the scheduler once (via drain) if immediate placement doesn't happen.
+        Raises if no progress is possible (e.g., due to resource/PG constraints).
+
+        Args:
+            task (Task): Declarative description of a remote call.
+
+        Returns:
+            ObjectRef: Handle to the produced value.
+
+        Raises:
+            RuntimeError: If the task could not be placed (no progress).
+        """
+        ref = self.scheduler.submit(task)
+        if ref is not None:
+            return ref
+
+        produced = self.scheduler.drain()
+        if not produced:
+            raise RuntimeError(
+                "Task could not be placed (no progress). "
+                "Check resources/placement group/pin constraints."
+            )
+        return produced[-1]
 
     def drain(self) -> List[ObjectRef]:
         """
@@ -183,54 +216,88 @@ class Session:
             return worker.store.put(value)  # type: ignore[attr-defined]
         return self._cache_store().put(value)
 
-    def get(self, ref: ObjectRef) -> Any:
+    def get(self, ref: Optional[ObjectRef]) -> Any:
         """
-        Retrieve the Python value for a given `ObjectRef`.
+        Retrieve the Python value for a given (possibly pending) reference.
 
-        Lookup order:
+        Lookup/drive order:
+            0) If `ref is None`, drive scheduling once to materialize the most recent result
             1) alias cache
             2) owner-first (only if the owner is local)
             3) scan local workers
-            4) remote fetch via router+rpc (then cache locally)
+            4) drive scheduling rounds until no further progress
+            5) remote fetch via router+rpc (then cache locally)
 
         Args:
-            ref (ObjectRef): Handle whose value should be fetched.
+            ref (Optional[ObjectRef]): Handle to fetch. If `None`, this means the call
+                was enqueued but not placed yet; we will drive the scheduler once and
+                use the most recently produced result as the target.
 
         Returns:
             Any: The stored Python object.
 
         Raises:
-            RuntimeError: If object is not found locally and networking is not configured.
+            RuntimeError: If object cannot be found locally and networking is not configured.
 
-        Examples:
-            >>> # After drain(), get values back (local or remote)
-            >>> [sess.get(r) for r in refs]  # doctest: +SKIP
+        Discussion:
+            Q. Why accept `None`?
+                In this teaching runtime, `remote()` may enqueue without immediate placement.
+                Accepting `None` lets `get()` mimic Ray's UX by driving scheduling to
+                materialize the most recent result and then fetching it.
         """
-        # 1) alias cache fast-path
-        local_id = self._aliases.get(ref.object_id)
-        if local_id is not None:
-            store = self._cache_store()
-            if store.has(local_id):
-                return store.get(ObjectRef(object_id=local_id, owner_node_id=getattr(store, "node_id", None)))
 
-        # 2) owner-first (when owner is local)
-        if ref.owner_node_id and (ref.owner_node_id in self._local_workers):
-            store = getattr(self._local_workers[ref.owner_node_id], "store")
-            if store.has(ref.object_id):
-                return store.get(ref)
+        # 0) If ref is None, drive once and take the most recently produced ref.
+        if ref is None:
+            produced = self.scheduler.drain()
+            if not produced:
+                raise RuntimeError(
+                    "get(None) was called but no tasks progressed. "
+                    "Make sure you submitted something before calling get()."
+                )
+            ref = produced[-1]
 
-        # 3) scan local workers
-        for w in self._local_workers.values():
-            store = getattr(w, "store")
-            if store.has(ref.object_id):
-                return store.get(ref)
+        def _try_local_lookup() -> Optional[Any]:
+            # 1) alias cache fast-path
+            local_id = self._aliases.get(ref.object_id)
+            if local_id is not None:
+                store = self._cache_store()
+                if store.has(local_id):
+                    return store.get(ObjectRef(object_id=local_id, owner_node_id=getattr(store, "node_id", None)))
 
-        # 4) remote fetch (requires router+rpc)
+            # 2) owner-first (when owner is local)
+            if ref.owner_node_id and (ref.owner_node_id in self._local_workers):
+                store = getattr(self._local_workers[ref.owner_node_id], "store")
+                if store.has(ref.object_id):
+                    return store.get(ref)
+
+            # 3) scan local workers
+            for w in self._local_workers.values():
+                store = getattr(w, "store")
+                if store.has(ref.object_id):
+                    return store.get(ref)
+
+            return None
+
+        # First attempt
+        val = _try_local_lookup()
+        if val is not None:
+            return val
+
+        # 4) Drive scheduling in rounds until no progress
+        progressed = True
+        while val is None and progressed:
+            produced = self.scheduler.drain()
+            progressed = bool(produced)
+            val = _try_local_lookup()
+
+        if val is not None:
+            return val
+
+        # 5) remote fetch (requires router+rpc)
         if self._router is not None and self._rpc is not None:
             owner_id = self._router.route_object(ref) or ref.owner_node_id
             if owner_id is None:
                 raise RuntimeError("No owner information available for remote get().")
-
             payload = self._rpc.get_object(owner_id, ref.object_id)
             cache = self._cache_store()
             local_ref = cache.put_bytes(payload)  # new local id
@@ -241,6 +308,51 @@ class Session:
             "Object not found in local stores and networking hooks are not configured. "
             "Provide `router` and `rpc` to enable remote get()."
         )
+
+    def create_placement_group(
+        self,
+        bundles: List[Union[Bundle, Dict]],
+        strategy: str = PlacementStrategy.PACK,
+        *,
+        pg_id: Optional[str] = None
+    ) -> PlacementGroup:
+        """
+        Create and register a placement group on this session's scheduler.
+
+        Args:
+            bundles (List[Union[Bundle, Dict]]): Resource bundles.
+            strategy (str): Placement strategy, either `PACK` or `SPREAD`.
+            pg_id (Optional[str]): Optional stable id; autogenerated if `None`.
+
+        Returns:
+            PlacementGroup: The created placement group.
+        """
+        assert strategy.upper() in (PlacementStrategy.PACK, PlacementStrategy.SPREAD), \
+            f"`strategy` must be either PACK or SPREAD, got {strategy}."
+
+        pid = pg_id or new_placement_group_id()
+
+        bundles_to_use = []
+        for b in bundles:
+            if isinstance(b, Bundle):
+                bundles_to_use.append(b)
+            elif isinstance(b, dict):
+                bundles_to_use.append(Bundle(**b))
+            else:
+                raise ValueError(f"Each bundle must be a Bundle or dict, got {type(b)}.")
+
+        pg = PlacementGroup(pg_id=pid, bundles=bundles_to_use, strategy=strategy)
+        self.scheduler.register_placement_group(pg)
+        return pg
+
+    def remove_placement_group(self, pg_id: str):
+        """
+        Remove a placement group from this session's scheduler.
+
+        Args:
+            pg_id (str): id of the placement group to remove.
+        """
+        self.scheduler.unregister_placement_group(pg_id)
 
 
 _GLOBAL_SESSION: Optional[Session] = None
@@ -318,8 +430,7 @@ def get(ref: ObjectRef) -> Any:
         >>> get(ref)
         123
     """
-    sess = get_session()
-    return sess.get(ref)
+    return get_session().get(ref)
 
 
 def put(value: Any, *, node_id: Optional[str] = None) -> ObjectRef:
@@ -336,16 +447,16 @@ def put(value: Any, *, node_id: Optional[str] = None) -> ObjectRef:
     Examples:
         >>> ref = put({"x": 1})  # doctest: +ELLIPSIS
     """
-    sess = get_session()
-    return sess.put(value, node_id=node_id)
+    return get_session().put(value, node_id=node_id)
 
 
-def submit(task: Task) -> Optional[ObjectRef]:
+def submit(task: Task, blocking: bool = True) -> Optional[ObjectRef]:
     """
     Convenience function: submit a task via the global session (enqueue-only).
 
     Args:
         task (Task): Declarative description of a remote function call.
+        blocking (bool): If True, use `submit_blocking()` to ensure an `ObjectRef` is returned.
 
     Returns:
         Optional[ObjectRef]: Always `None` in the enqueue-only model.
@@ -357,8 +468,7 @@ def submit(task: Task) -> Optional[ObjectRef]:
         >>> get(refs[-1])
         7
     """
-    sess = get_session()
-    return sess.submit(task)
+    return get_session().submit(task, blocking=blocking)
 
 
 def drain() -> List[ObjectRef]:
@@ -371,5 +481,33 @@ def drain() -> List[ObjectRef]:
     Examples:
         >>> refs = drain()  # doctest: +ELLIPSIS
     """
-    sess = get_session()
-    return sess.drain()
+    return get_session().drain()
+
+
+def create_placement_group(
+    bundles: List[Union[Bundle, Dict]],
+    strategy: str = PlacementStrategy.PACK,
+    pg_id: Optional[str] = None
+) -> PlacementGroup:
+    """
+    Convenience function: create a placement group via the global session.
+
+    Args:
+        bundles (List[Union[Bundle, Dict]]): Resource bundles.
+        strategy (str): Placement strategy, either `PACK` or `SPREAD`.
+        pg_id (Optional[str]): Optional stable id; autogenerated if `None`.
+
+    Returns:
+        PlacementGroup: The created placement group.
+    """
+    return get_session().create_placement_group(bundles, strategy, pg_id=pg_id)
+
+
+def remove_placement_group(pg_id: str):
+    """
+    Convenience function: remove a placement group via the global session.
+
+    Args:
+        pg_id (str): id of the placement group to remove.
+    """
+    return get_session().remove_placement_group(pg_id)

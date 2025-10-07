@@ -231,8 +231,28 @@ class RpcServer:
                         Response: {"ok": true, "payload_b64": "..."}
                         """
                         body = self._json()
-                        object_id = str(body.get("object_id"))
-                        payload = self.server.worker.rpc_read_object_bytes(object_id)  # noqa
+                        object_id = body.get("object_id")
+                        if not object_id:
+                            self._send(
+                                HTTPStatus.BAD_REQUEST,
+                                {"ok": False, "error": {"type": "BadRequest", "message": "missing 'object_id'"}}
+                            )
+                            return
+                        try:
+                            payload = self.server.worker.rpc_read_object_bytes(str(object_id))  # noqa
+                        except KeyError:
+                            self._send(
+                                HTTPStatus.NOT_FOUND,
+                                {"ok": False, "error": {"type": "NotFound", "message": f"object not found: {object_id}"}}
+                            )
+                            return
+                        except Exception as e:
+                            self._send(
+                                HTTPStatus.INTERNAL_SERVER_ERROR,
+                                {"ok": False, "error": {"type": type(e).__name__, "message": str(e), "traceback": traceback.format_exc()}}
+                            )
+                            return
+
                         b64 = base64.b64encode(payload).decode("ascii")
                         # because base64 only uses ASCII chars, so don't need to decode as UTF-8
 
@@ -250,9 +270,37 @@ class RpcServer:
                         Response: {"ok": true, "ref": {"object_id": "...", "owner_node_id": "...", "size_bytes": null}}
                         """
                         body = self._json()
-                        blob = base64.b64decode(body.get("task_b64", ""))
-                        task: Task = loads(blob)
-                        ref = self.server.worker.rpc_execute_task(task)  # noqa
+                        task_b64 = body.get("task_b64")
+                        if not task_b64:
+                            self._send(
+                                HTTPStatus.BAD_REQUEST,
+                                {"ok": False, "error": {"type": "BadRequest", "message": "missing 'task_b64'"}}
+                            )
+                            return
+                        try:
+                            blob = base64.b64decode(task_b64.encode("ascii"))
+                        except Exception as e:
+                            self._send(
+                                HTTPStatus.BAD_REQUEST,
+                                {"ok": False, "error": {"type": "BadRequest", "message": "invalid base64", "traceback": traceback.format_exc()}}
+                            )
+                            return
+                        try:
+                            task: Task = loads(blob)
+                        except Exception as e:
+                            self._send(
+                                HTTPStatus.BAD_REQUEST,
+                                {"ok": False, "error": {"type": "BadRequest", "message": "invalid task payload", "traceback": traceback.format_exc()}}
+                            )
+                            return
+                        try:
+                            ref = self.server.worker.rpc_execute_task(task)  # noqa
+                        except Exception as e:
+                            self._send(
+                                HTTPStatus.INTERNAL_SERVER_ERROR,
+                                {"ok": False, "error": {"type": type(e).__name__, "message": str(e), "traceback": traceback.format_exc()}}
+                            )
+                            return
 
                         self._send(
                             HTTPStatus.OK, {

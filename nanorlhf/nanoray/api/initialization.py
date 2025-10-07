@@ -113,7 +113,7 @@ def init(
 
     # zero-arg default
     if nodes is None:
-        nodes = {"Local": NodeConfig(local=True, start_server=True)}
+        nodes = {"local": NodeConfig(local=True, start_server=True)}
 
     logger.info("Initializing nanoray runtime with nodes: %s", nodes)
 

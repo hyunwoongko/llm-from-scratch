@@ -2,6 +2,7 @@ import heapq
 from typing import Dict, List, Tuple, Optional, Protocol
 
 from nanorlhf.nanoray.core.object_ref import ObjectRef
+from nanorlhf.nanoray.core.placement import PlacementGroup, PlacementStrategy
 from nanorlhf.nanoray.core.task import Task
 from nanorlhf.nanoray.scheduler.node_state import NodeState
 from nanorlhf.nanoray.scheduler.policies import SchedulingPolicy
@@ -53,14 +54,6 @@ class Scheduler:
             (3) Executes on that node's `Worker`
             (4) Returns the produced `ObjectRef`
 
-        Q. How does queueing work when placement fails?
-            Tasks that cannot be placed immediately go into a priority queue ordered
-            by `priority` (higher first) and FIFO within the same priority.
-
-        Q. Where are `num_cpus`, `num_gpus`, `resources`, and `priority` used?
-            They are consumed at *placement*: we filter by available capacity, enqueue
-            by `priority`, and pick one candidate via the policy. `Worker` only executes.
-
         Q. Why `WorkerLike`?
             To decouple placement from execution transport. A local `Worker` and a
             remote-RPC-backed `WorkerProxy` can both satisfy the same protocol,
@@ -90,9 +83,12 @@ class Scheduler:
         self._order = order
         self.policy.set_node_order(order)
 
-        # priority queue of pending tasks: (-priority, seq, task)
-        self._q: List[Tuple[int, int, Task]] = []
+        self._q: List[Tuple[int, Task]] = []  # (seq, task)
         self._seq = 0
+
+        # placement groups
+        self._pgs: Dict[str, PlacementGroup] = {}
+        self._pg_assign: Dict[str, Dict[object, str]] = {}
 
     def submit(self, task: Task) -> Optional[ObjectRef]:
         """
@@ -105,8 +101,10 @@ class Scheduler:
         Returns:
             Optional[ObjectRef]: Result reference if placed now, else `None`.
         """
-        neg_pri = -int(task.priority or 0)
-        heapq.heappush(self._q, (neg_pri, self._seq, task))
+        ref = self._try_place(task)
+        if ref is not None:
+            return ref
+        heapq.heappush(self._q, (self._seq, task))
         self._seq += 1
         return None
 
@@ -123,7 +121,7 @@ class Scheduler:
 
                 1) Start a round with `progressed=False` and an empty `pending`.
 
-                2) Pop every task in order (priority first, FIFO within same priority).
+                2) Pop every task in order (FIFO).
                    For each task:
                      - Try to place it now (`_try_place`).
                      - If placed: append the returned `ObjectRef` to `produced`
@@ -131,8 +129,7 @@ class Scheduler:
                      - If not placed: append the tuple back into `pending`.
 
                 3) After inspecting the whole heap once, push every item in `pending`
-                   back into the heap unchanged. This preserves both *priority* and
-                   *FIFO order* because we reinsert the same `(priority, seq, task)` tuples.
+                   back into the heap unchanged.
 
                 4) If at least one task ran (`progressed=True`), we do another round,
                    because completed tasks may have freed resources and unlocked others.
@@ -154,12 +151,12 @@ class Scheduler:
 
         while self._q and progressed:
             progressed = False
-            pending: List[Tuple[int, int, Task]] = []
+            pending: List[Tuple[int, Task]] = []
             while self._q:
-                priority, seq, task = heapq.heappop(self._q)
+                seq, task = heapq.heappop(self._q)
                 ref = self._try_place(task)
                 if ref is None:
-                    pending.append((priority, seq, task))
+                    pending.append((seq, task))
                 else:
                     produced.append(ref)
                     progressed = True
@@ -177,10 +174,56 @@ class Scheduler:
         Returns:
             List[str]: Node IDs that can run the task.
         """
-        return [
-            nid for nid, state in self._state.items()
-            if state.can_run(task)
+        if getattr(task, "pinned_node_id", None):
+            nid = task.pinned_node_id
+            if nid in self._state and self._state[nid].can_run(task):
+                return [nid]
+            return []
+
+        # 1) Filter by capacity (baseline)
+        capacity_ok = [
+            nid for nid, state in self._state.items() if state.can_run(task)
         ]
+
+        # 2) If placement grouped, refine the candidate set
+        pg_id = getattr(task, "placement_group_id", None)
+        if not pg_id:
+            return capacity_ok
+
+        pg = self._pgs.get(pg_id, None)
+        if pg is None:
+            raise ValueError(
+                "`PlacementGroup` must be registered with the scheduler before use. "
+                "Use `nanorlhf.nanoray.create_placement_group(...)` rather than `PlacementGroup(...)` directly. "
+                "The `create_placement_group(...)` function will register it automatically."
+            )
+
+        assign = self._pg_assign.setdefault(pg_id, {})
+
+        if pg.strategy == PlacementStrategy.PACK:
+            # If group already packed to a node, stick to it.
+            locked = assign.get("__pack__")
+            if locked:
+                # The task will only run on the locked node if it has capacity
+                return [nid for nid in capacity_ok if nid == locked]
+            else:
+                # First placement will lock; for new keep capacity_ok
+                return capacity_ok
+
+        elif pg.strategy == PlacementStrategy.SPREAD:
+            idx = getattr(task, "bundle_index", 0) or 0
+            chosen = assign.get(idx)
+            if chosen:
+                # Already assigned -> stick to it if capacity allows.
+                return [nid for nid in capacity_ok if nid == chosen]
+            else:
+                # Not yet assigned -> prefer unused nodes first.
+                used = set(assign.values())
+                prefer = [nid for nid in capacity_ok if nid not in used]
+                return prefer or capacity_ok
+
+        # Unknown placement strategy -> ignore
+        return capacity_ok
 
     def _try_place(self, task: Task) -> Optional[ObjectRef]:
         """
@@ -202,10 +245,39 @@ class Scheduler:
 
         st = self._state[nid]
         st.allocate(task)
-
         try:
             worker = self._workers[nid]
             ref = worker.execute_task(task)
+            # If PG, record the final assignment now that placement successful
+            pg_id = getattr(task, "placement_group_id", None)
+            if pg_id and pg_id in self._pgs:
+                pg = self._pgs[pg_id]
+                assign = self._pg_assign.setdefault(pg_id, {})
+                if pg.strategy == PlacementStrategy.PACK:
+                    assign.setdefault("__pack__", nid)
+                elif pg.strategy == PlacementStrategy.SPREAD:
+                    idx = getattr(task, "bundle_index", 0) or 0
+                    assign.setdefault(idx, nid)
             return ref
         finally:
             st.release(task)
+
+    def register_placement_group(self, pg: PlacementGroup):
+        """
+        Register a placement group so the scheduler can honor it.
+
+        Args:
+            pg (PlacementGroup): The placement group to register.
+        """
+        self._pgs[pg.pg_id] = pg
+        self._pg_assign.setdefault(pg.pg_id, {})
+
+    def unregister_placement_group(self, pg_id: str):
+        """
+        Unregister a placement group.
+
+        Args:
+            pg_id (str): The ID of the placement group to unregister.
+        """
+        self._pgs.pop(pg_id, None)
+        self._pg_assign.pop(pg_id, None)

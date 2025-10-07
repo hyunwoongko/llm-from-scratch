@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Optional, Protocol
 
+from nanorlhf.nanoray.api.session import get_session
+from nanorlhf.nanoray.core.actor import actor as actor_class
 from nanorlhf.nanoray.core.object_ref import ObjectRef
+from nanorlhf.nanoray.core.placement import PlacementGroup
 from nanorlhf.nanoray.core.runtime_env import RuntimeEnv
 from nanorlhf.nanoray.core.task import Task
 
@@ -20,7 +23,6 @@ class RemoteFunction:
         num_cpus (float): CPU requirement for scheduling (teaching-scale).
         num_gpus (float): GPU requirement for scheduling.
         resources (Dict[str, float]): Custom named resource requirements.
-        priority (int): Higher value means earlier scheduling.
         runtime_env (Optional[RuntimeEnv]): Scoped env applied around this task.
 
     Examples:
@@ -28,7 +30,7 @@ class RemoteFunction:
         >>> from nanorlhf.nanoray.api.remote import remote
         >>> from nanorlhf.nanoray.api.session import get, drain
         >>>
-        >>> @remote(num_cpus=1.0, priority=10)
+        >>> @remote(num_cpus=2.0)
         ... def add(x, y): return x + y
         ...
         >>> sess = init()                      # zero-arg init
@@ -53,8 +55,9 @@ class RemoteFunction:
     num_cpus: float = 1.0
     num_gpus: float = 0.0
     resources: Dict[str, float] = None
-    priority: int = 0
     runtime_env: Optional[RuntimeEnv] = None
+    placement_group: Optional[PlacementGroup] = None
+    bundle_index: Optional[int] = None
 
     def __post_init__(self) -> None:
         if self.resources is None:
@@ -66,8 +69,9 @@ class RemoteFunction:
         num_cpus: Optional[float] = None,
         num_gpus: Optional[float] = None,
         resources: Optional[Dict[str, float]] = None,
-        priority: Optional[int] = None,
         runtime_env: Optional[RuntimeEnv] = None,
+        placement_group: Optional[PlacementGroup] = None,
+        bundle_index: Optional[int] = None,
     ) -> "RemoteFunction":
         """
         Return a new RemoteFunction with per-call overrides.
@@ -76,16 +80,16 @@ class RemoteFunction:
             >>> @remote()
             ... def f(x): return x * 2
             ...
-            >>> g = f.options(priority=100)
-            >>> # g.remote(...) submits with higher scheduling priority
+            >>> g = f.options(num_cpus=2.0)
         """
         return RemoteFunction(
             fn=self.fn,
             num_cpus=self.num_cpus if num_cpus is None else float(num_cpus),
             num_gpus=self.num_gpus if num_gpus is None else float(num_gpus),
             resources=self.resources if resources is None else dict(resources),
-            priority=self.priority if priority is None else int(priority),
             runtime_env=self.runtime_env if runtime_env is None else runtime_env,
+            placement_group=self.placement_group if placement_group is None else placement_group,
+            bundle_index=self.bundle_index if bundle_index is None else bundle_index,
         )
 
     def task(self, *args: Any, **kwargs: Any) -> Task:
@@ -108,8 +112,9 @@ class RemoteFunction:
             num_cpus=self.num_cpus,
             num_gpus=self.num_gpus,
             resources=dict(self.resources),
-            priority=int(self.priority),
             runtime_env=self.runtime_env,
+            placement_group_id=self.placement_group.pg_id if self.placement_group else None,
+            bundle_index=self.bundle_index,
         )
 
     def remote(self, *args: Any, **kwargs: Any) -> Optional[ObjectRef]:
@@ -129,14 +134,9 @@ class RemoteFunction:
             >>> # after init()
             >>> r = add.remote(3, 4)   # may be None if queued
         """
-        try:
-            # Lazy import to avoid import cycles at module import time
-            from nanorlhf.nanoray.api.session import submit  # type: ignore
-        except Exception as exc:  # pragma: no cover
-            raise RuntimeError("Global session is not available; call init() first.") from exc
-
         task = self.task(*args, **kwargs)
-        return submit(task)  # Optional[ObjectRef]
+        sess = get_session()
+        return sess.submit(task, blocking=True)
 
 
 def remote(_fn: Optional[Callable[..., Any]] = None, **opts: Any) -> Callable[..., RemoteFunction] | RemoteFunction:
@@ -149,17 +149,17 @@ def remote(_fn: Optional[Callable[..., Any]] = None, **opts: Any) -> Callable[..
 
         # or:
         def g(x): ...
-        g = remote(g, priority=5)
+        g = remote(g, num_cpus=2.0)
 
     Args:
         _fn (Optional[Callable]): The function to wrap when used as `remote(fn, ...)`.
-        **opts: Options forwarded to `RemoteFunction` (num_cpus, num_gpus, resources, priority, runtime_env).
+        **opts: Options forwarded to `RemoteFunction` (num_cpus, num_gpus, resources, runtime_env).
 
     Returns:
         RemoteFunction or a decorator that produces one.
 
     Examples:
-        >>> @remote(priority=1)
+        >>> @remote(num_cpus=2.0)
         ... def mul(x, y): return x * y
         ...
         >>> # submit immediately (requires init())
@@ -167,9 +167,17 @@ def remote(_fn: Optional[Callable[..., Any]] = None, **opts: Any) -> Callable[..
         >>> # or build a task without submitting:
         >>> task = mul.task(6, 7)
     """
+
     def _wrap(fn: Callable[..., Any]) -> RemoteFunction:
         return RemoteFunction(fn=fn, **opts)
 
     if _fn is None:
         return _wrap
     return _wrap(_fn)
+
+
+def actor(cls: type):
+    """
+    Public re-export for actor class decorator.
+    """
+    return actor_class(cls)

@@ -1,7 +1,7 @@
 import base64
 import json
 from typing import Dict, Any, Optional
-from urllib import request
+from urllib import request, error
 
 from nanorlhf.nanoray.core.object_ref import ObjectRef
 from nanorlhf.nanoray.core.serialization import dumps
@@ -58,6 +58,14 @@ class RpcClient:
                 with request.urlopen(req, timeout=self._timeout) as resp:
                     raw = resp.read()
                     return json.loads(raw)
+            except error.HTTPError as e:
+                try:
+                    # Try to parse JSON error body returned by server
+                    body_txt = e.read().decode("utf-8", errors="replace")
+                    return json.loads(body_txt)
+                except Exception:
+                    last_exc = RuntimeError(f"{e} (no JSON body)")
+                    continue
             except Exception as e:
                 last_exc = e
                 continue
@@ -82,8 +90,10 @@ class RpcClient:
         )
 
         if not res.get("ok"):
-            err_msg = res.get("error", "unknown error")
-            raise RuntimeError(f"Remote get_object failed: {err_msg}")
+            err = res.get("error", {})
+            msg = err.get("message", err)
+            tb = err.get("traceback", "")
+            raise RuntimeError(f"Remote get_object failed: {msg}\n{tb}")
         return base64.b64decode(res["payload_b64"])
 
     def execute_task(self, node_id: str, task: Task) -> ObjectRef:
@@ -106,13 +116,10 @@ class RpcClient:
         )
 
         if not res.get("ok"):
-            err_msg = res.get("error", "unknown error")
-            remote_tb = res.get("traceback")
-            raise RuntimeError(
-                f"Remote execute_task failed: {err_msg}\n"
-                f"--- Remote Traceback ---\n"
-                f"{remote_tb}"
-            )
+            err = res.get("error", {})
+            msg = err.get("message", err)
+            tb = err.get("traceback", "")
+            raise RuntimeError(f"Remote execute_task failed: {msg}\n--- Remote Traceback ---\n{tb}")
 
         ref_info = res["ref"]
         return ObjectRef(
