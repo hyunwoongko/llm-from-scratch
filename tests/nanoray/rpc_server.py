@@ -3,8 +3,8 @@ import signal
 import sys
 
 from nanorlhf.nanoray import shutdown
-from nanorlhf.nanoray.network.rpc_server import RpcServer
 from nanorlhf.nanoray.core.object_store import ObjectStore
+from nanorlhf.nanoray.network.rpc_server import RpcServer
 from nanorlhf.nanoray.runtime.worker import Worker
 
 
@@ -12,7 +12,8 @@ def main():
     ap = argparse.ArgumentParser("nanoray node")
     ap.add_argument("--node-id", required=True)
     ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, required=True)
+    ap.add_argument("--port", type=int, default=8003)
+    # ap.add_argument("--port", type=int, default=8004)
     ap.add_argument("--token", default=None)
     args = ap.parse_args()
 

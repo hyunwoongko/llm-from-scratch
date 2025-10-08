@@ -209,7 +209,7 @@ class ActorMethod:
             runtime_env=o.runtime_env,
             task_id=new_task_id(),
         )
-        return sess.submit_blocking(task)
+        return sess.submit(task, blocking=True)
 
 
 class ActorClass:

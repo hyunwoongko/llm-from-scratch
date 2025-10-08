@@ -144,37 +144,20 @@ class Session:
             ...     _ = sess.submit(Task.from_call(lambda x: x + 1, args=(i,)))
             >>> refs += sess.drain()
         """
-        if blocking:
-            return self.submit_blocking(task)
-        return self.scheduler.submit(task)
 
-    def submit_blocking(self, task: Task) -> ObjectRef:
-        """
-        Submit a task and ensure an ObjectRef is returned (never None).
-
-        This drives the scheduler once (via drain) if immediate placement doesn't happen.
-        Raises if no progress is possible (e.g., due to resource/PG constraints).
-
-        Args:
-            task (Task): Declarative description of a remote call.
-
-        Returns:
-            ObjectRef: Handle to the produced value.
-
-        Raises:
-            RuntimeError: If the task could not be placed (no progress).
-        """
         ref = self.scheduler.submit(task)
         if ref is not None:
             return ref
-
-        produced = self.scheduler.drain()
-        if not produced:
-            raise RuntimeError(
-                "Task could not be placed (no progress). "
-                "Check resources/placement group/pin constraints."
-            )
-        return produced[-1]
+        if blocking is True:
+            produced = self.scheduler.drain()
+            if not produced:
+                raise RuntimeError(
+                    "Task could not be placed (no progress). "
+                    "Check resources/placement group/pin constraints."
+                )
+            return produced[-1]
+        else:
+            return None
 
     def drain(self) -> List[ObjectRef]:
         """
