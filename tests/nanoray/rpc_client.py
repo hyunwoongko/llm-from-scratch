@@ -45,7 +45,6 @@ def test_actor_sticky_remote_server():
             self.x += n
             return self.x
 
-    # B에 생성
     h = get(Counter.options(pinned_node_id="B").remote())
     out = get(h.inc.remote(5))
     assert out == 5

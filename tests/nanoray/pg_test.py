@@ -18,7 +18,6 @@ def test_pg_pack_remote_function_all_on_one_node():
     _ = _init_multi(RoundRobin())
     sess = get_session()
 
-    # PACK -> 같은 노드에 고정
     pg = sess.create_placement_group(
         bundles=[Bundle(cpus=0.0), Bundle(cpus=0.0)],
         strategy=PlacementStrategy.PACK,
@@ -39,7 +38,6 @@ def test_pg_spread_remote_function_alternates_nodes():
     _ = _init_multi(RoundRobin())
     sess = get_session()
 
-    # SPREAD -> 번들 인덱스별로 분산
     pg = sess.create_placement_group(
         bundles=[Bundle(cpus=0.0), Bundle(cpus=0.0)],
         strategy=PlacementStrategy.SPREAD,
@@ -50,7 +48,6 @@ def test_pg_spread_remote_function_alternates_nodes():
         import os, platform
         return platform.node(), os.getpid()
 
-    # bundle_index 0/1 교차
     refs = [
         whoami.options(placement_group=pg, bundle_index=(i % 2)).remote()
         for i in range(8)
@@ -80,7 +77,6 @@ def test_pg_pack_actors_same_node():
     h1 = get_val(Tag.options(placement_group=pg).remote("x"))
     h2 = get_val(Tag.options(placement_group=pg).remote("y"))
 
-    # 생성된 ActorRef 의 owner_node_id 비교
     assert h1.owner_node_id == h2.owner_node_id
 
 

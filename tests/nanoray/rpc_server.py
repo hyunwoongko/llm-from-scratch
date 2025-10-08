@@ -28,7 +28,7 @@ def main():
 
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
-    srv.start()  # serve_forever()
+    srv.start()
 
 
 if __name__ == "__main__":

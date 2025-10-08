@@ -59,7 +59,6 @@ class Learner:
 
 
 def main():
-    # 단일 노드 init (멀티노드 서버/노드 구성도 그대로 동작)
     _ = init()
 
     try:

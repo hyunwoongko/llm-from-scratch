@@ -47,9 +47,7 @@ def test_actor_pinned_to_specific_node_inprocess():
         def owner(self):
             return self.id_
 
-    # B로 핀 고정 생성
     h_ref = Holder.options(pinned_node_id="B").remote("hello")
     h = get_val(h_ref)
-    # 메서드 호출은 항상 B에서 실행됨
     out = get_val(h.owner.remote())
     assert out == "hello"
