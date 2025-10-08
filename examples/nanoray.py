@@ -1,11 +1,9 @@
-# examples/nanoray_pretty.py
 from collections import Counter
 from typing import List, Tuple
 
 from nanorlhf import nanoray
 
 
-# ---------- Remote functions & actors ----------
 @nanoray.remote()
 def add(a: int, b: int) -> int:
     return a + b
@@ -40,7 +38,6 @@ class TokenizerActor:
         return platform.node(), os.getpid()
 
 
-# ---------- Pretty-print helpers ----------
 def banner(title: str):
     print(f"\n=== {title} ===")
 
