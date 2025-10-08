@@ -1,4 +1,5 @@
 import logging
+import platform
 import threading
 import time
 from dataclasses import dataclass
@@ -113,7 +114,7 @@ def init(
 
     # zero-arg default
     if nodes is None:
-        nodes = {"local": NodeConfig(local=True, start_server=True)}
+        nodes = {platform.node(): NodeConfig(local=True, start_server=True)}
 
     logger.info("Initializing nanoray runtime with nodes: %s", nodes)
 
