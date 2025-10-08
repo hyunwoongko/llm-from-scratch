@@ -107,8 +107,6 @@ class Session:
         # Remote object_id -> local cached object_id
         self._aliases: Dict[str, str] = {}
 
-    # ---------- internal helpers ----------
-
     def _cache_store(self) -> ObjectStore:
         """
         Return the store used to cache fetched objects locally.
@@ -120,8 +118,6 @@ class Session:
             return getattr(self._local_workers[self._default_node_id], "store")
         assert self._driver_store is not None
         return self._driver_store
-
-    # ---------- driver surface ----------
 
     def submit(self, task: Task, blocking=False) -> Optional[ObjectRef]:
         """
