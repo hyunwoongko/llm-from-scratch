@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional, List
 
 import numpy as np
-import torch.cuda
+import torch
 import torch.distributed as dist
 
 from nanorlhf.nanotron.distributed.initializers import (

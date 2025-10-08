@@ -86,19 +86,19 @@ class SeedManager:
         self._current_mode = mode
         torch.cuda.set_rng_state(self._seed_states[mode])
 
-    def add_seed(self, mode: ParallelMode, seed: int, overwrtie: bool = False):
+    def add_seed(self, mode: ParallelMode, seed: int, overwrite: bool = False):
         """
         Add a new seed for a specific parallel mode.
 
         Args:
             mode (ParallelMode): The parallel mode to add the seed for.
             seed (int): The seed value to set.
-            overwrtie (bool): Whether to overwrite an existing seed for the mode. Default is False.
+            overwrite (bool): Whether to overwrite an existing seed for the mode. Default is False.
         """
         assert isinstance(
             mode, ParallelMode
         ), "A valid ParallelMode must be provided"
-        if overwrtie is False:
+        if overwrite is False:
             assert (
                 mode not in self._seed_states
             ), f"The seed for {mode} has been added"
