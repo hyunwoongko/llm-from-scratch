@@ -1,6 +1,6 @@
 from typing import Optional, Dict, Any, List
 
-from nanorlhf.nanosets.base.bitmap import Bitmap
+from nanorlhf.nanosets.core.bitmap import Bitmap
 from nanorlhf.nanosets.dtype.array import Array, ArrayBuilder
 from nanorlhf.nanosets.dtype.dtype import STRUCT
 from nanorlhf.nanosets.dtype.list_array import ListArrayBuilder, infer_child_builder

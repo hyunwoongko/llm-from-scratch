@@ -1,8 +1,8 @@
 import struct
 from typing import Optional, List
 
-from nanorlhf.nanosets.base.bitmap import Bitmap
-from nanorlhf.nanosets.base.buffer import Buffer
+from nanorlhf.nanosets.core.bitmap import Bitmap
+from nanorlhf.nanosets.core.buffer import Buffer
 from nanorlhf.nanosets.dtype.array import Array, ArrayBuilder
 from nanorlhf.nanosets.dtype.dtype import STRING
 

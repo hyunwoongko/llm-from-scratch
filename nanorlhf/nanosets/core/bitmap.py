@@ -1,6 +1,6 @@
 from typing import Optional, List
 
-from nanorlhf.nanosets.base.buffer import Buffer
+from nanorlhf.nanosets.core.buffer import Buffer
 
 
 class Bitmap:
