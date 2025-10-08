@@ -103,14 +103,8 @@ def loads(buf: bytes) -> Any:
 
     Raises:
         ValueError: If header is malformed or algorithm is unknown.
-
-    Discussion:
-        Q. Why not accept legacy raw-pickle bytes?
-            For teaching clarity we standardize on the framed format. If needed,
-            add a backward-compatible branch: if not buf.startswith(_MAGIC) → legacy.
     """
     if not buf.startswith(_MAGIC):
-        # legacy/unframed fallback (optional)
         return cloudpickle.loads(buf)
 
     alg = buf[len(_MAGIC): len(_MAGIC) + 4]
